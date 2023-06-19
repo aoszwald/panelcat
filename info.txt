@@ -1,0 +1,17 @@
+To create a new panel file, choose a tab-delimited target region file. 
+Optionally, specify a row number to start reading the file and skip additional headers. 
+If the first three columns do not correspond to "chromosome, start, stop coordinates" of the regions, specify the columns containing chromosome, start, end coordinates (e.g. "1,2,3" without ""). 
+Use the same approach for an optional mask file. 
+Panel files can be stored by download after analysis is complete and uploaded again at a later time. 
+---
+"RefSeq" refers to the exon base coverage of the panels. 
+"ClinVar" refers to the targeted variants listed in ClinVar.
+"COSMIC" refers to the targeted mutations listed in the COSMIC CMC data.
+
+For the Panel analysis and the graphical output, only "pathogenic"/"likely pathogenic" Variants in Clinvar are used, and Tier 1-3 oncogenic mutations in Cosmic CMC.
+The "Clinvar" and "COSMIC" tabs show all variants / mutations listed in the databases that are targeted by the panel, regardless of clinical significance.
+
+---
+Research use only. 
+PanelCat is released under AGPL-3 License. 
+Author: André Oszwald
