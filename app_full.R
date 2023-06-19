@@ -1,17 +1,46 @@
-library(shiny)
-library(shinyjs)
-library(ggplot2)
-library(plotly)
-library(DT)
-library(shinyalert)
-library(data.table)
-library(stringr)
-library(tidyr)
-library(dplyr)
-library(randomcoloR)
-library(GenomicFeatures)
-library(fst)
-library(ggrepel)
+# Dependencies ------------------------------------------------------------
+if(!require(shiny)){
+  install.packages("shiny")
+  library(shiny)}
+if(!require(shinyjs)){
+  install.packages("shinyjs")
+  library(shinyjs)}
+if(!require(ggplot2)){
+  install.packages("ggplot2")
+  library(ggplot2)}
+if(!require(plotly)){
+  install.packages("plotly")
+  library(plotly)}
+if(!require(DT)){
+  install.packages("DT")
+  library(DT)}
+if(!require(shinyalert)){
+  install.packages("shinyalert")
+  library(shinyalert)}
+if(!require(data.table)){
+  install.packages("data.table")
+  library(data.table)}
+if(!require(stringr)){
+  install.packages("stringr")
+  library(stringr)}
+if(!require(tidyr)){
+  install.packages("tidyr")
+  library(tidyr)}
+if(!require(randomcoloR)){
+  install.packages("randomcoloR")
+  library(randomcoloR)}
+if (!require("BiocManager", quietly = TRUE)){
+  install.packages("BiocManager")
+  BiocManager::install(version = "3.17")} 
+if(!require(GenomicFeatures)){
+  BiocManager::install("GenomicFeatures")
+  library(GenomicFeatures)}
+if(!require(fst)){
+  install.packages("fst")
+  library(fst)}
+if(!require(ggrepel)){
+  install.packages("ggrepel")
+  library(ggrepel)}
 options(repos = BiocManager::repositories())
 options(timeout = 360)
 
@@ -183,6 +212,7 @@ options(timeout = 360)
         "GENE_NAME","CGC_TIER","Mutation CDS","Mutation AA","chr","start","end","COSMIC_SAMPLE_POSRATE","Mutation Description CDS","Mutation Description AA",
         "GENOMIC_MUTATION_ID","MUTATION_SIGNIFICANCE_TIER"
       )]
+      cmc_ori <<- cmc_ori
       incProgress(0, detail = "saving COSMIC db")
       write.fst(cmc_ori, paste0("cmc_", format(Sys.time(), "%Y%m%d_%H%M%S"),".fst"), compress = 100)
       cmc_path <<- list.files(pattern = "cmc_", full.names = T)[length(list.files(pattern = "cmc_"))]
