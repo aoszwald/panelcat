@@ -26,6 +26,9 @@ if(!require(stringr)){
 if(!require(tidyr)){
   install.packages("tidyr")
   library(tidyr)}
+if(!require(dplyr)){
+  install.packages("dplyr")
+  library(dplyr)}
 if(!require(randomcoloR)){
   install.packages("randomcoloR")
   library(randomcoloR)}
