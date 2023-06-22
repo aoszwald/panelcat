@@ -12,4 +12,9 @@ PanelCAT is also available via (https://aoszwald.shinyapps.io/panelcat)
 - The cmc_export.tsv file may be deleted after this step is complete.
 ## operation
 
-Panel analyses files can be manually deleted or added from the "panels" folder. The panels are loaded upon running the app.R script. 
+## operation - continued
+- Analysed panels are stored in the "panels" subfolder.
+- Every time panels are analysed or updated, a new file or version of a file is created. These files can be manually removed, replaced, etc.
+- PanelCAT will load the most recent version of each panel analysis upon start.
+- In case the most recent panel analyses were not all analyzed using the same reference databases, a warning will be issued on startup. This problem can be solved by updating all panels.
+- In case panel analyses were not all analyzed using the same version of PanelCat, an error will be issued on startup. This problem can be solved by first updating all panels analyzed with the outdated version using the newer panelcat version, and then adding the newer panels. Alternatively, it is possible to perform new analyses of each panel (this may be easier)
