@@ -14,6 +14,7 @@ PanelCAT is also available via (https://aoszwald.shinyapps.io/panelcat)
 - Run "App_full.R" (for full functionality) or "App.R" (in case of hosting the app in a network, see details below)
 - View analyses results in different tabs. Most of the time, the presentation of results can be controlled by adjusting one or more input parameters.
 ## operation - New panel analysis
+- PanelCat uses hg19 (GRCh37) based databases. Please ensure that your target region file is also hg19 (GRCh37) based.
 - To analyse a new panel, go to the "NewPanel" tab. Target regions need to be provided as a tab-separated table (typically .bed or .txt) that includes the following columns: Chromosome, Start, Stop (e.g. chr1	27100287	27100394). Additional columns may be present.
 - Note that the chromosome ID needs the "chr" prefix, e.g. "chr1" (not "1"), or "chrX" (not "X").
 - If the software does not automatically detect the first row of the coordinates, a start row (and optionally, a stop row) may be specified by entering the row numbers seperated by a comma (eg. "5" or "5,250")
