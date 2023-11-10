@@ -51,7 +51,7 @@ options(timeout = 360)
   debugMode <- F
   
   # PanCatversion
-  PanCatv <- 26
+  PanCatv <- 29
   
   count_nna_func <- function(x) sum(!is.na(x))
   
