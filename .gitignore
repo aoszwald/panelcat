@@ -1,8 +1,7 @@
-txdb.*
-clvmd5.*
-exdb.*
-sqldb.*
+txdb*
+clvmd5*
+exdb*
+sqldb*
 cmc_export.*
-panelcat.Rproj
-.Rhistory
-.*Rproj.*
+*Rhistory*
+*Rproj*
