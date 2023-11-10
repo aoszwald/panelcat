@@ -28,7 +28,7 @@ if(!require(tidyr)){
   library(tidyr)}
 if(!require(dplyr)){
   install.packages("dplyr")
-  library(dplyr)}
+  library(tidyr)}
 if(!require(randomcoloR)){
   install.packages("randomcoloR")
   library(randomcoloR)}

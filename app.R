@@ -1,17 +1,47 @@
-library(shiny)
-library(shinyjs)
-library(ggplot2)
-library(plotly)
-library(DT)
-library(shinyalert)
-library(data.table)
-library(stringr)
-library(tidyr)
-library(dplyr)
-library(randomcoloR)
-library(GenomicFeatures)
-library(fst)
-library(ggrepel)
+# Dependencies ------------------------------------------------------------
+if(!require(shiny)){
+  install.packages("shiny")
+  library(shiny)}
+if(!require(shinyjs)){
+  install.packages("shinyjs")
+  library(shinyjs)}
+if(!require(ggplot2)){
+  install.packages("ggplot2")
+  library(ggplot2)}
+if(!require(plotly)){
+  install.packages("plotly")
+  library(plotly)}
+if(!require(DT)){
+  install.packages("DT")
+  library(DT)}
+if(!require(shinyalert)){
+  install.packages("shinyalert")
+  library(shinyalert)}
+if(!require(data.table)){
+  install.packages("data.table")
+  library(data.table)}
+if(!require(stringr)){
+  install.packages("stringr")
+  library(stringr)}
+if(!require(tidyr)){
+  install.packages("tidyr")
+  library(tidyr)}
+if(!require(dplyr)){
+  install.packages("dplyr")
+  library(dplyr)}
+if(!require(randomcoloR)){
+  install.packages("randomcoloR")
+  library(randomcoloR)}
+if (!require("BiocManager", quietly = TRUE)){
+  install.packages("BiocManager")
+  BiocManager::install(version = "3.17")} 
+if(!require(GenomicFeatures)){
+  BiocManager::install("GenomicFeatures")
+  library(GenomicFeatures)}
+if(!require(RSQLite)){
+  install.packages("RSQLite")
+  library(RSQLite)
+}
 options(repos = BiocManager::repositories())
 options(timeout = 360)
 
@@ -21,7 +51,7 @@ options(timeout = 360)
   debugMode <- F
   
   # PanCatversion
-  PanCatv <- 24
+  PanCatv <- 26
   
   count_nna_func <- function(x) sum(!is.na(x))
   
@@ -43,52 +73,56 @@ options(timeout = 360)
   }
   
   # RefSeq loader
-  loadRefSeq <- function(updateDb) {
-    if ((updateDb == FALSE | debugMode == TRUE) & length(txdb_path) != 0) {
-      if (exists("txdb") == F) {
-        incProgress(1, detail = "Loading RefSeq database")
-        txdb <<- loadDb(txdb_path)
-      } else {
-        incProgress(1, detail = "Loading RefSeq database")
+  prepRefSeq <- function(updateDb) {
+    withProgress(message = "Preparing RefSeq database", {
+      # if database path does not exist, create new
+      if ((length(txdb_path) == 0 | updateDb == T) & debugMode == F) {
+        incProgress(0.3, detail = "Downoading")
+        txdb <<- makeTxDbFromGFF("https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh37_latest/refseq_identifiers/GRCh37_latest_genomic.gff.gz",
+                                 dataSource = "https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh37_latest/refseq_identifiers/GRCh37_latest_genomic.gff.gz")
+        incProgress(0.3, detail = "Processing")
+        assRep <- read.table("https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/annotation_releases/105.20220307/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_assembly_report.txt", fill = T)
+        seqlevels(txdb) <- seqlevels(txdb)[1:24]
+        seqlevels(txdb) <- assRep$V11[1:24]
+        ex_by_ge <- exonsBy(txdb, by="gene")
+        incProgress(0.3, detail = "Saving")
+        saveRDS(ex_by_ge, paste0("txdb_", format(Sys.time(), "%Y%m%d_%H%M%S"),".rds"))
       }
-    } else {
-      incProgress(1, detail = "update RefSeq db")
-      txdb <<- makeTxDbFromGFF("https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh37_latest/refseq_identifiers/GRCh37_latest_genomic.gff.gz",
-                               dataSource = "https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh37_latest/refseq_identifiers/GRCh37_latest_genomic.gff.gz")
-      incProgress(0, detail = "saving txdb")
-      saveDb(txdb, paste0("txdb_", format(Sys.time(), "%Y%m%d_%H%M%S"),".rds"))
-      txdb_path <<- list.files(pattern = "txdb_", full.names = T)[length(list.files(pattern = "txdb_"))]
-    }
-    if (length(assRep_path != 0)) {
-      assRep <<- readRDS(assRep_path)
-    } else {
-      assRep <<- read.table("https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/annotation_releases/105.20220307/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_assembly_report.txt", fill = T)
-      saveRDS(assRep, paste0("assRep_", format(Sys.time(), "%Y%m%d_%H%M%S"),".rds"))
-    }
-    seqlevels(txdb) <<- seqlevels(txdb)[1:24]
-    seqlevels(txdb) <<- assRep$V11[1:24] 
-    if (exists("ex_by_ge") == F) {
-      incProgress(0, detail = "Get Exons")
-      ex_by_ge <<- exonsBy(txdb, by="gene")
-    }
-  }
-  
-  createExonTable <- function() {
-    if (!exists("ex_by_ge_df1")) {
-      withProgress(message = "Preparation", value = 0, max = 4, {
-        loadRefSeq(updateDb = FALSE)
+      # if exon table does not exist, or if Db was updated, create
+      if ((length(txdb_path) == 0 | length(exdb_path) == 0 | updateDb == T)& debugMode == F) {
+        incProgress(0.3, detail = "Create exon table")
         ex_by_ge_df1 <- (as.data.table(unlist(ex_by_ge)))
         splitnames <- str_split_fixed(ex_by_ge_df1$exon_name, "-",3)
         colnames(splitnames) <- c("name","transcript","exon")
         ex_by_ge_df1 <- cbind(ex_by_ge_df1, splitnames)
         ex_by_ge_df1 <- subset(ex_by_ge_df1, select = -c(exon_name,name))
         ex_by_ge_df1$exon <- as.numeric(ex_by_ge_df1$exon)
-        ex_by_ge_df1 <<- ex_by_ge_df1
+        # save exon table and path for later
+        saveRDS(ex_by_ge_df1, paste0("exdb_", format(Sys.time(), "%Y%m%d_%H%M%S"),".rds"))
+        txdb_path <<- list.files(pattern = "txdb_", full.names = T)[length(list.files(pattern = "txdb_"))]
+        exdb_path <<- list.files(pattern = "exdb_", full.names = T)[length(list.files(pattern = "exdb_"))]
+      }
+    })
+  }
+  
+  loadRefSeq <- function(force) {
+    prepRefSeq(updateDb = F)
+    if (exists("ex_by_ge") == F | force == T) {
+      withProgress(message = "Loading RefSeq database", {
+        ex_by_ge <<- readRDS(txdb_path)
       })
+    } 
+  }
+  
+  loadExDb <- function() {
+    if (length(exdb_path) == 0) 
+      prepRefSeq(updateDb = F)
+    if (exists("ex_by_ge_df1") == F) {
+      ex_by_ge_df1 <<- readRDS(exdb_path)
     }
   }
   
-  # CLINVAR update check and loader
+  # CLINVAR update check (only used via "update all")
   updateCheckClv <- function() {
     url <- "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh37/weekly/clinvar.vcf.gz.md5"
     tmp <- tempfile()
@@ -107,122 +141,139 @@ options(timeout = 360)
     }
   }
   
-  loadClinVar <- function(updateDb) {
-    if ((updateDb == FALSE | debugMode == TRUE) & length(clv_path) != 0) {
-      if (exists("clinvar") == F) {
-        incProgress(1, detail = "Loading ClinVar database")
-        clinvar <<- read.fst(clv_path, as.data.table = T)
-      } else {
-        incProgress(1, detail = "Loading ClinVar database")
+  # Clinvar loader / creator
+  prepClinvar <- function(updateDb) {
+    withProgress(message = "Preparing ClinVar database", {
+      # first, check if db exists or forced update, if not, create
+      if ((length(clv_path) == 0 | updateDb == T) & debugMode == F) {
+        incProgress(0.2, detail = "Preparing to process original database")
+        url <- "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh37/weekly/clinvar.vcf.gz.md5"
+        tmp <- tempfile()
+        download.file(url, tmp)
+        clvMd5Serv <- readLines(tmp)
+        saveRDS(clvMd5Serv, paste0("clvmd5_", format(Sys.time(), "%Y%m%d_%H%M%S"),".rds"))
+        tmp <- tempfile()
+        download.file("https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh37/weekly/clinvar.vcf.gz", tmp)
+        incProgress(0.4, detail = "Post-processing")
+        clinvar <- as.data.table(read.table(gzfile(tmp)))
+        colnames(clinvar) <- c("CHROM","POS","ID","REF","ALT","QUAL","FILTER","INFO")
+        clinvar$QUAL <- NULL
+        clinvar$FILTER <- NULL
+        clinvar$CHROM <- paste0("chr",clinvar$CHROM)
+        clinvar$clnsig <- str_match(clinvar$INFO, "CLNSIG=\\s*(.*?)\\s*;")[,2]
+        clinvar$clnrevstat <- str_match(clinvar$INFO, "CLNREVSTAT=\\s*(.*?)\\s*;")[,2]
+        clinvar <- clinvar[!is.na(clinvar$clnsig),]
+        clinvar$gene <- str_match(clinvar$INFO, "GENEINFO=\\s*(.*?)\\s*;")[,2]
+        clinvar$INFO <- NULL
+        clinvar <- clinvar %>% mutate(gene = str_split(clinvar$gene, "\\|")) %>%
+          unnest(gene)
+        clinvar$gene <- remove_gene_number(clinvar$gene)
+        clinvar <- clinvar[,c("gene","CHROM","POS","ID","REF","ALT","clnsig","clnrevstat")]
+        incProgress(0.1, detail = "Saving")
+        sqldb_clinvar <- dbConnect(SQLite(), dbname=paste0("sqldb_clinvar_", format(Sys.time(), "%Y%m%d_%H%M%S")))
+        dbWriteTable(sqldb_clinvar, "clinvar", clinvar, row.names=F, overwrite=T, append=F, field.types=NULL)
+        clv_path <<- list.files(pattern = "sqldb_clinvar_", full.names = T)[length(list.files(pattern = "sqldb_clinvar_"))]
       }
-    } else {
-      incProgress(1, detail = "Updating ClinVar db")
-      url <- "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh37/weekly/clinvar.vcf.gz.md5"
-      tmp <- tempfile()
-      download.file(url, tmp)
-      clvMd5Serv <- readLines(tmp)
-      saveRDS(clvMd5Serv, paste0("clvmd5_", format(Sys.time(), "%Y%m%d_%H%M%S"),".rds"))
-      
-      url <- "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh37/weekly/clinvar.vcf.gz"
-      tmp <- tempfile()
-      download.file(url, tmp)
-      
-      clinvar <- as.data.table(read.table(gzfile(tmp)))
-      colnames(clinvar) <- c("#CHROM","POS","ID","REF","ALT","QUAL","FILTER","INFO")
-      clinvar$QUAL <- NULL
-      clinvar$FILTER <- NULL
-      clinvar$`#CHROM` <- paste0("chr",clinvar$`#CHROM`)
-      clinvar$clnsig <- str_match(clinvar$INFO, "CLNSIG=\\s*(.*?)\\s*;")[,2]
-      clinvar$clnrevstat <- str_match(clinvar$INFO, "CLNREVSTAT=\\s*(.*?)\\s*;")[,2]
-      clinvar <- clinvar[!is.na(clinvar$clnsig),]
-      clinvar$gene <- str_match(clinvar$INFO, "GENEINFO=\\s*(.*?)\\s*;")[,2]
-      clinvar$INFO <- NULL
-      clinvar <- clinvar %>% mutate(gene = str_split(clinvar$gene, "\\|")) %>%
-        unnest(gene)
-      clinvar$gene <- remove_gene_number(clinvar$gene)
-      clinvar <- clinvar[,c("gene","#CHROM","POS","ID","REF","ALT","clnsig","clnrevstat")]
-      incProgress(0, detail = "saving clinvar db")
-      write.fst(clinvar, paste0("clinvar_", format(Sys.time(), "%Y%m%d_%H%M%S"),".fst"), compress = 100)
-      clinvar <<- clinvar
-      clv_path <<- list.files(pattern = "clinvar_", full.names = T)[length(list.files(pattern = "clinvar_"))]
+    })
+  }
+  
+  loadClinVar <- function(updateDb) {
+      if (exists("gr_clinvar") == F) {
+        withProgress(message = "Loading ClinVar database", {
+          prepClinvar(updateDb = F)
+        incProgress(0.5, detail = "Loading")
+        sqldb_clinvar <- dbConnect(SQLite(), dbname=clv_path)
+        gr_clinvar <<- GRanges(dbGetQuery(sqldb_clinvar, paste0('select CHROM from clinvar'))[,1],
+                               IRanges(dbGetQuery(sqldb_clinvar, paste0('select POS from clinvar'))[,1],
+                                       dbGetQuery(sqldb_clinvar, paste0('select POS from clinvar'))[,1]+
+                                         (nchar(dbGetQuery(sqldb_clinvar, paste0('select REF from clinvar'))[,1])-1)))
+      })
     }
   }
   
   # COSMIC loader
-  loadCosmic <- function(updateDb) {
-    if ((updateDb == FALSE | debugMode == TRUE) & length(cmc_path) != 0) {
-      if (exists("cmc_ori") == F) {
-        incProgress(1, detail = "reading CMC db")
-        cmc_ori <<- read.fst(cmc_path, as.data.table = T)
-      } else {
-        incProgress(1, detail = "reading CMC db")
-      }
-    } else {
-      library(Seurat)
-      incProgress(1, detail = "Get COSMIC db")
-      cmc_ori <- fread("db_ori/cmc_export.tsv")
-      cmc_genes <- data.frame("ori" = setdiff(unique(cmc_ori$GENE_NAME), names(ex_by_ge)))
-      cmc_genes$new <- cmc_genes$ori
-      for (i in 1:nrow(cmc_genes)) {
-        incProgress(0, detail = paste0("Update names: ", cmc_genes$ori[i]))
-        cmc_genes$new[i] <- UpdateSymbolList(cmc_genes$ori[i])
-      }
-      cmc_ori$GENE_NAME[cmc_ori$GENE_NAME %in% cmc_genes$ori] <- cmc_genes$new[match(cmc_ori$GENE_NAME[cmc_ori$GENE_NAME %in% cmc_genes$ori], cmc_genes$ori)]
-      # remove muts without coordinates
-      cmc_ori <- cmc_ori[cmc_ori$`Mutation genome position GRCh37` != "",]  
-      # grab seqnames and coordinates
-      cmc_ori$chr <- paste0("chr", str_split_fixed(cmc_ori$`Mutation genome position GRCh37`, ":", 2)[,1])
-      cmc_ori$chr[cmc_ori$chr == "chr23"] <- "chrX"
-      cmc_ori$chr[cmc_ori$chr == "chr24"] <- "chrY"
-      cmc_ori$chr[cmc_ori$chr == "chr25"] <- "chrMT"
-      cmc_ori$coords <- str_split_fixed(cmc_ori$`Mutation genome position GRCh37`, ":", 2)[,2]
-      cmc_ori$start <- as.numeric(str_split_fixed(cmc_ori$coords, "-", 2)[,1])
-      cmc_ori$end <- as.numeric(str_split_fixed(cmc_ori$coords, "-", 2)[,2])
-      cmc_ori$COSMIC_SAMPLE_POSRATE <- cmc_ori$COSMIC_SAMPLE_MUTATED / cmc_ori$COSMIC_SAMPLE_TESTED
-      cmc_ori <- cmc_ori[,c(
-        "GENE_NAME","CGC_TIER","Mutation CDS","Mutation AA","chr","start","end","COSMIC_SAMPLE_POSRATE","Mutation Description CDS","Mutation Description AA",
-        "GENOMIC_MUTATION_ID","MUTATION_SIGNIFICANCE_TIER"
-      )]
-      incProgress(0, detail = "saving COSMIC db")
-      write.fst(cmc_ori, paste0("cmc_", format(Sys.time(), "%Y%m%d_%H%M%S"),".fst"), compress = 100)
-      cmc_path <<- list.files(pattern = "cmc_", full.names = T)[length(list.files(pattern = "cmc_"))]
+  prepCosmic <- function() {
+      # first, check if db exists or forced update, if not, create
+      if (length(cmc_path) == 0) {
+        withProgress(message = "Preparing COSMIC database", {
+        # need RefSeq ex_by_ge for this
+        loadRefSeq(force = F)
+        incProgress(0.1, detail = "Preparing to process original database")
+        library(Seurat)
+        cmc_ori <- fread("db_ori/cmc_export.tsv")
+        cmc_genes <- data.frame("ori" = setdiff(unique(cmc_ori$GENE_NAME), names(ex_by_ge)))
+        cmc_genes$new <- cmc_genes$ori
+        for (i in 1:nrow(cmc_genes)) {
+          incProgress((0.6/nrow(cmc_genes)), detail = paste0("Update names: ", cmc_genes$ori[i]))
+          cmc_genes$new[i] <- UpdateSymbolList(cmc_genes$ori[i])
+        }
+        incProgress(0.1, detail = "Post-processing")
+        cmc_ori$GENE_NAME[cmc_ori$GENE_NAME %in% cmc_genes$ori] <- cmc_genes$new[match(cmc_ori$GENE_NAME[cmc_ori$GENE_NAME %in% cmc_genes$ori], cmc_genes$ori)]
+        # remove muts without coordinates
+        cmc_ori <- cmc_ori[cmc_ori$`Mutation genome position GRCh37` != "",]  
+        # grab seqnames and coordinates
+        cmc_ori$chr <- paste0("chr", str_split_fixed(cmc_ori$`Mutation genome position GRCh37`, ":", 2)[,1])
+        cmc_ori$chr[cmc_ori$chr == "chr23"] <- "chrX"
+        cmc_ori$chr[cmc_ori$chr == "chr24"] <- "chrY"
+        cmc_ori$chr[cmc_ori$chr == "chr25"] <- "chrMT"
+        cmc_ori$coords <- str_split_fixed(cmc_ori$`Mutation genome position GRCh37`, ":", 2)[,2]
+        cmc_ori$start <- as.numeric(str_split_fixed(cmc_ori$coords, "-", 2)[,1])
+        cmc_ori$end <- as.numeric(str_split_fixed(cmc_ori$coords, "-", 2)[,2])
+        cmc_ori$COSMIC_SAMPLE_POSRATE <- cmc_ori$COSMIC_SAMPLE_MUTATED / cmc_ori$COSMIC_SAMPLE_TESTED
+        cmc_ori <- cmc_ori[,c(
+          "GENE_NAME","CGC_TIER","Mutation CDS","Mutation AA","chr","start","end","COSMIC_SAMPLE_POSRATE","Mutation Description CDS","Mutation Description AA",
+          "GENOMIC_MUTATION_ID","MUTATION_SIGNIFICANCE_TIER"
+        )]
+        # save to sql
+        incProgress(0.1, detail = "Saving")
+        sqldb_cosmic <- dbConnect(SQLite(), dbname=paste0("sqldb_cosmic_", format(Sys.time(), "%Y%m%d_%H%M%S")))
+        dbWriteTable(sqldb_cosmic, "cosmic", cmc_ori, row.names=F, overwrite=T, append=F, field.types=NULL)
+        # read coords, then disconnect, save path for later
+        cmc_path <<- list.files(pattern = "sqldb_cosmic_", full.names = T)[length(list.files(pattern = "sqldb_cosmic_"))]
+      })
     }
   }
   
+  loadCosmic <- function() {
+    withProgress(message = "Loading COSMIC database", {
+      prepCosmic()
+      # check if ranges are loaded, if not, load
+      incProgress(0.1, detail = "Loading")
+      if (exists("gr_cmc") == F) {
+        incProgress(0.5, detail = "loading cosmic database")
+        sqldb_cosmic <- dbConnect(SQLite(), dbname=cmc_path)
+        gr_cmc <<- GRanges(dbGetQuery(sqldb_cosmic, paste0('select chr from cosmic'))[,1],
+                           IRanges(dbGetQuery(sqldb_cosmic, paste0('select start from cosmic'))[,1],
+                                   dbGetQuery(sqldb_cosmic, paste0('select end from cosmic'))[,1]))
+      }
+    })
+  }
+      
   # load and list panel files - need to transition to proper database at some point
   panelfiles <- list.files(path = "panels", pattern = ".panel", full.names = T)
+  # maybe try this later  
+  # panelfiles_table <- data.frame(date = str_extract(panel panelfiles, "\\d{8}"), time = str_extract(panelfiles, "(\\d+)(?!.*\\d)"))
+  panelfiles_table <- as.data.frame(str_split_fixed(panelfiles, "_",2)) %>% group_by(V1) %>% arrange(desc(V2)) %>% dplyr::slice(1:1)
+  panelfiles_table$V3 <- paste(panelfiles_table$V1, panelfiles_table$V2, sep = "_")
+  panelfiles <- panelfiles[panelfiles %in% panelfiles_table$V3]
   dbx <- lapply(panelfiles, readRDS)
-  dbx_table <- data.frame("panel" = unlist(nameList(dbx, 1)), "sysTimeCreated" = unlist(nameList(dbx, "sysTimeCreated"))) %>%
-    group_by(panel) %>%
-    mutate("current" = sysTimeCreated == max(sysTimeCreated))
-  dbx <- dbx[dbx_table$current]
+  
+  # get all gene names- write this properly at a later point, vector needs to exist for the app not to crash on reactive drop down generation
+  all_genes <- vector()
+  for (i in 1:length(dbx)) {
+    all_genes <- c(all_genes, dbx[[i]][["panelTable"]]$gene)
+  }
+  all_genes <- data.frame("gene" = sort(unique(all_genes)))
   
   # Check if PanelCat version is identical across panels, then finalise dbx by naming items, else skip loading and warn
   if (length(unique(unlist(nameList(dbx, "panelCatVersion")))) == 1) {
     names(dbx) <- nameList(dbx, "panelName")
     # how to check if panels with same name are completely different, e.g. compare rows of original target file, TBD
-    # get genes of all panels
-    all_genes <- vector()
-    for (i in 1:length(dbx)) {
-      all_genes <- c(all_genes, dbx[[i]][["panelTable"]]$gene)
-    }
-    all_genes <- data.frame("gene" = sort(unique(all_genes)))
-    
-    # combine paneltables into one table
-    dbx2 <- cbind(data.frame("panel" = rep(dbx[[1]][["panelName"]], nrow(all_genes))),
-                  left_join(all_genes, dbx[[1]][["panelTable"]]))
-    if (length(dbx) > 1) {
-      for (i in 2:length(dbx)) {
-        dbx2 <- rbind(dbx2, 
-                      cbind(data.frame("panel" = rep(dbx[[i]][["panelName"]], nrow(all_genes))),
-                            left_join(all_genes, dbx[[i]][["panelTable"]])))
-      }
-    }
     status_dbload_success <- T
   } else {
     status_dbload_success <- F
   }
-  
+  # check if the reference databases versions of all loaded panels are the same
   if (length(unique(unlist(nameList(dbx, "txdbv")))) > 1 | 
       length(unique(unlist(nameList(dbx, "clvv")))) > 1 | 
       length(unique(unlist(nameList(dbx, "clvgv")))) > 1 | 
@@ -234,12 +285,37 @@ options(timeout = 360)
   
   # look for existing databases
   txdb_path <- list.files(pattern = "txdb_", full.names = T)[length(list.files(pattern = "txdb_"))]
-  cmc_path <- list.files(pattern = "cmc_", full.names = T)[length(list.files(pattern = "cmc_"))]
-  clv_path <- list.files(pattern = "clinvar_", full.names = T)[length(list.files(pattern = "clinvar_"))]
+  exdb_path <- list.files(pattern = "exdb_", full.names = T)[length(list.files(pattern = "exdb_"))]
+  cmc_path <- list.files(pattern = "sqldb_cosmic_", full.names = T)[length(list.files(pattern = "sqldb_cosmic_"))]
+  clv_path <- list.files(pattern = "sqldb_clinvar_", full.names = T)[length(list.files(pattern = "sqldb_clinvar_"))]
   clv_md5_path <- list.files(pattern = "clvmd5", full.names = T)[length(list.files(pattern = "clvmd5"))]
-  assRep_path <- list.files(pattern = "assRep_", full.names = T)[length(list.files(pattern = "assRep_"))]
   
   infotext <- readLines("info.txt")
+  
+  # create translate dataframe for silly panelTable variables (find better solution)
+  inputxyc <- data.frame(code = names(dbx[[1]][["panelTable"]]), display = c("gene",
+                                                                             "coding bases, not covered",
+                                                                             "coding bases, covered",
+                                                                             "coding bases, masked",
+                                                                             "coding bases, covered not masked",
+                                                                             "coding bases, total known",
+                                                                             "coding bases, covered not masked  %",
+                                                                             "coding bases, covered %",
+                                                                             "cosmic muts, not covered",
+                                                                             "cosmic muts, covered",
+                                                                             "cosmic muts, masked",
+                                                                             "cosmic muts, covered not masked",
+                                                                             "cosmic muts, total known",
+                                                                             "cosmic muts, covered not masked  %",
+                                                                             "cosmic muts, covered %",
+                                                                             "clinvar muts, not covered",
+                                                                             "clinvar muts, covered",
+                                                                             "clinvar muts, masked",
+                                                                             "clinvar muts, covered not masked",
+                                                                             "clinvar muts, total known",
+                                                                             "clinvar muts, covered not masked  %",
+                                                                             "clinvar muts, covered %"
+  ))
 }
 # Define UI ---------------------------------------------------------------
 
@@ -248,72 +324,73 @@ css <- "div.dataTables_wrapper  div.dataTables_filter {width: 100%; float: none;
 ui <- ui <- fluidPage(
   useShinyjs(),
   tags$head(tags$style(HTML(css,"pre { white-space: pre-wrap; word-break: keep-all; }"))),
-  headerPanel('PanelCat'),
+  headerPanel('PanelCat - GrCh37 (Research use only)'),
   
   sidebarPanel(
     conditionalPanel(
-      condition = "input.test=='Scatterplot'",
+      condition = "input.test=='Gene metrics, X/Y'",
       uiOutput("xpanelsel"),
-      uiOutput("xcolsel"),
+      selectInput("xcol", "Variable X",inputxyc$display[2:nrow(inputxyc)],selected = "coding bases, covered not masked"),
       uiOutput("ypanelsel"),
-      uiOutput("ycolsel"),
-      verbatimTextOutput("tableInfo")),
+      selectInput("ycol", "Variable Y",inputxyc$display[2:nrow(inputxyc)],selected = "coding bases, covered not masked")),
     conditionalPanel(
-      condition = "input.test=='Barplot'",
+      condition = "input.test=='Gene metrics, column'",
       uiOutput("barpanelsel"),
-      selectInput('dtset','Dataset', c("RefSeq","ClinVar","COSMIC")),
-      textInput("diff_filter","Diff Filter", value = 0),
+      selectInput('dtset','Dataset', c("RefSeq coding bases","ClinVar mutations","COSMIC mutations")),
+      textInput("diff_filter","Filter by fold change between 1st and 2nd selected panels", value = 1),
       selectInput("vsort", "Sort by", c("gene","minFC","total","ratio","max_cov","max_covp")),
       radioButtons("dtsetrel","display",c("absolute","relative"), selected = "absolute")),
     conditionalPanel(
-      condition = "input.test=='Gene'",
+      condition = "input.test=='Gene metrics, search'",
       uiOutput("genepanelsel"),
       uiOutput("genesel"),
-      selectInput('dtsetgenes','Dataset', c("RefSeq","ClinVar","COSMIC")),
+      selectInput('dtsetgenes','Dataset', c("RefSeq coding bases","ClinVar mutations","COSMIC mutations")),
       radioButtons("dtsetrelg","display",c("absolute","relative"), selected = "absolute")),
     conditionalPanel(
-      condition = "input.test == 'Exons'",
+      condition = "input.test == 'Exon table'",
       uiOutput("expanelsel")),
     conditionalPanel(
-      condition = "input.test == 'ExonComp'",
-      uiOutput("exoncovpxsel"),
-      uiOutput("exoncovpysel"),
+      condition = "input.test == 'Exon graph'",
+      uiOutput("exoncomp_panelsel"),
       uiOutput("exoncovgsel"),
-      uiOutput("exoncovtsel")),
+      uiOutput("exoncovtsel"),
+      selectInput("exoncomp_rel","display",c("absolute","relative"), selected = "absolute")),
     conditionalPanel(
-      condition = "input.test == 'COSMIC'",
+      condition = "input.test == 'COSMIC table'",
       uiOutput("mutpanelsel"),
-      checkboxInput("showCmcBl","Hide masked", value = T)),
+      checkboxInput("hideCmcBl","Hide masked", value = T)),
     conditionalPanel(
-      condition = "input.test == 'ClinVar'",
+      condition = "input.test == 'ClinVar table'",
       uiOutput("clvpanelsel"),
-      checkboxInput("showClvBl","Hide masked", value = T)),
+      checkboxInput("hideClvBl","Hide masked", value = T)),
     conditionalPanel(
-      condition = "input.test=='NonCovRate'",
+      condition = "input.test=='Non-covered mutation rate'",
       selectInput("ncovSort","Sort by",c("panel","ncov_all","ncov_all_bl","ncov_targ","ncov_targ_bl"), selected = "panel")),
     conditionalPanel(
-      condition = "input.test=='Table'",
-      selectInput('tablePanels', 'Panels (choose multiple)', names(dbx), selected = "OFC", multiple = T),
-      selectInput('tableVars', 'Variables (choose multiple)', names(dbx2), selected = c("pcb_covp"), multiple = T),
+      condition = "input.test=='Gene metrics, table'",
+      uiOutput("sel_tablePanels"),
+      selectInput('tableVars', 'Variables (choose multiple)', inputxyc$display[2:nrow(inputxyc)], selected = c("coding bases, covered not masked"), multiple = T),
       verbatimTextOutput("tableInfo2")),
-    conditionalPanel(# DOES NOT YET PANELS ADDED IN SESSION
-      condition = "input.test=='Panels'",
-      selectInput('panelInspect', "Select Panel", names(dbx), selected = names(dbx)[1], size = 25, selectize = F)),
     conditionalPanel(
-      condition = "input.test=='NewPanel'",
-      textInput("pName","Panel Name (abbreviation)"),
-      textInput("pfName","Panel Name (full)"),
-      fileInput("file1","Panel target file (tab delimited, bed file)"),
-      checkboxInput("zeroIndex","Zero-Indexed (.bed convention)?", value = T),
-      textInput("pRows","start row, end row"),
-      textInput("pCols","Column order: Chr, Start, Stop, Name"),
-      fileInput("blackl","Panel blacklist file (optional)"),
-      textInput("pmRows","Mask start row, end row"),
-      textInput("pmCols","Mask column order: Chr, Start, Stop, Name"),
-      actionButton("startb", "Start!"),
-      downloadButton("save_state", "Save to file"),
-      fileInput("panelUp","processed panel file", accept = ".panel"),
-      actionButton("panelUpButton","upload")
+      condition = "input.test=='Panels'",
+      uiOutput("sel_panelInspect")),
+    conditionalPanel(
+      condition = "input.test=='New analysis'",
+      fileInput("file1","1: Panel target file (tab delimited, bed file)"),
+      checkboxInput("zeroIndex","2: Zero-Indexed (.bed convention)?", value = T),
+      textInput("pName","3: Panel Name (abbreviation)"),
+      textInput("pfName","4: Panel Name (full)"),
+      textInput("pRows","5: start row, end row"),
+      textInput("pCols","6: Column order: Chr, Start, Stop, Name"),
+      fileInput("blackl","7: Panel mask file"),
+      textInput("pmRows","8: Mask start row, end row"),
+      textInput("pmCols","9: Mask column order: Chr, Start, Stop, Name"),
+      actionButton("startb", "10: Start!"),
+      downloadButton("save_state", "11: Save to file"),
+      fileInput("panelUp","12: processed panel file", accept = ".panel"),
+      actionButton("panelUpButton","12: upload")
+      # comment the next line if hosting for others
+      #,actionButton("updateb", "13: UPDATE ALL")
     ),
     width = 3
   ),
@@ -321,32 +398,41 @@ ui <- ui <- fluidPage(
   mainPanel(
     tabsetPanel(
       id = "test",
-      tabPanel("Scatterplot", 
+      tabPanel("Gene metrics, X/Y",span("Compare several target region metrics of two panels in an X/Y point graph (scatterplot). Each datapoint represents a gene. You can select two different panels, or compare different metrics within one panel. Below, you will find a contrast of the targeted genes."), 
                plotlyOutput("plot1"),
                verbatimTextOutput("stats")),
-      tabPanel("Barplot",
+      tabPanel("Gene metrics, column", span("Visualize per-gene coverage of one or multiple panels and the extent of variant masking. Do not select too many panels, or performance will suffer."),
                plotOutput("plot2")),
-      tabPanel("Gene",
+      tabPanel("Gene metrics, search", span("Compare target regions of one or more genes of interest across one or multiple panels. Similar to barplot but more suitable for large number of panels."),
                verbatimTextOutput("unpanels"),
                plotlyOutput("plotGenes")),
-      tabPanel("NonCovRate",
-               plotlyOutput("nCovPosRate")),
-      tabPanel("Table",
+      tabPanel("Gene metrics, table", span("View the data used to construct the graphs in tabular form. "),
                DT::dataTableOutput("table", width = 100)),
-      tabPanel("Exons",
+      tabPanel("Non-covered mutation rate", span("View the estimated rate that tested samples will encounter mutations outside specified target regions. Mutation frequency is calculated from the COSMIC database, and does not take into account different tumor entities, or whether samples were analysed genome-wide or using targeted screens."),
+               plotlyOutput("nCovPosRate")),
+      tabPanel("Exon graph", span("Compare targeted extent of individual exons of any single transcript across single or multiple panels. Hint: select the panels you wish to compare FIRST, because selecting new panels will discard your current gene/transcript selection."),
+               plotlyOutput("exonCompP")),
+      tabPanel("Exon table", span("For a specific panel, assess the targeted portion of all exons of all transcripts of all genes listed in refseq. Hint: Try filtering the columns for specific genes and transcripts, and searching the table for specific mutations)"),
                DT::dataTableOutput("exons", width = 100)),
-      tabPanel("ExonComp",
-               plotOutput("exonCompP")),
-      tabPanel("COSMIC",
+      tabPanel("COSMIC table", span("Inspect coding mutations (from the COSMIC mutation census database) that are targeted by a specific panel. Hint: Try filtering the columns for specific genes and transcripts, and searching the table for specific mutations)"),
                DT::dataTableOutput("cmcmuts", width = 100)),
-      tabPanel("ClinVar",
+      tabPanel("ClinVar table", span("Inspect ClinVar mutations that are targeted by a specific panel. This table includes ALL mutations (i.e. not only pathogenic / likely pathogenic), unlike the other visualisations in PanelCat. Hint: Try filtering the columns for specific genes and transcripts, and searching the table for specific mutations)"),
                DT::dataTableOutput("clvmuts", width = 100)),
-      tabPanel("Panels",
+      tabPanel("Panels", span("Inspect previously analyzed panels, including time stamps (i.e. versions) of the reference databases."),
                verbatimTextOutput("viewP")),
-      tabPanel("NewPanel", 
+      tabPanel("New analysis", span("To create a new panel file, choose a tab-delimited target region file (1). These files are typically provided as .bed files by the manufacturers of NGS panels. 
+                                   If the target region file does not adhere to .bed conventions, uncheck the box (2).
+                                   Specify an abbreviation for use in drop-down menus, charts, etc. (3). 
+                                   Specify a full name for a meaningful identification (4). 
+                                   If the file contains additional headers or other rows at the end, specify the line numbers (e.g. 2,2000) of file to be included in the analysis (5).
+                                   If the first three columns of the file do not correspond to chromosome, start and stop coordinates, specifiy the position and order of the respective columns (e.g. 2,3,4) to be included in the analysis (6). 
+                                   Use the same approach for an optional mask file (7-9). 
+                                   For convenience, panel analyses can be stored by download (11) after analysis is complete and uploaded again at a later time (12)."),
+               span("You can initiate an update of RefSeq and ClinVar databases and a re-analysis of all currently loaded panels (13). To update COSMIC, you will have to remove the existing sqldb_cosmic_<date>_<time> file and place a current cmc_export.tsv in the db_ori folder."),
                tableOutput("contents"),
                tableOutput("maskFileContent")),
-      tabPanel("Info",
+      tabPanel("Info",span(""),
+               imageOutput("catpic"),
                verbatimTextOutput("infotext"))
     ))
 )
@@ -356,6 +442,10 @@ ui <- ui <- fluidPage(
 
 server <- function(input, output) {
   options(shiny.maxRequestSize=500*1024^2)
+  
+  observe({
+    shinyalert("DISCLAIMER and user agreement:", text = "This software is intended for reasearch use only, and not intended to make medical decisions. By proceeding, the user agrees to take sole responsibility, and not to hold the authors/providers of this software responsible, for any decisions based on information obtained through this application.")
+  })
   
   # check if DBs loaded
   if (status_dbload_success != T) {
@@ -376,19 +466,11 @@ server <- function(input, output) {
   
   # define reactive inputs
   output$xpanelsel <- renderUI({
-    selectInput('xpanel', 'X Panel', dbxn$panelNames, selected = dbxn$panelNames[1])
+    selectInput('xpanel', 'Panel X', dbxn$panelNames, selected = dbxn$panelNames[1])
   })
   
   output$ypanelsel <- renderUI({
-    selectInput('ypanel', 'Y Panel', dbxn$panelNames, selected = dbxn$panelNames[2])
-  })
-  
-  output$xcolsel <- renderUI({
-    selectInput("xcol", "X Variable",names(dbx2)[2:ncol(dbx2)],selected = "pcb_covp")
-  })
-  
-  output$ycolsel <- renderUI({
-    selectInput("ycol", "Y Variable",names(dbx2)[2:ncol(dbx2)],selected = "pcb_covp")
+    selectInput('ypanel', 'Panel Y', dbxn$panelNames, selected = dbxn$panelNames[2])
   })
   
   output$barpanelsel <- renderUI({
@@ -415,41 +497,24 @@ server <- function(input, output) {
     selectInput('genes', 'Genes (choose multiple)', dbxn$geneNames, selected = "KRAS", multiple = T)
   })
   
-  output$exoncovpxsel <- renderUI({
-    selectInput('exoncovpx', 'Panel 1', dbxn$panelNames, selected = dbxn$panelNames[1])
-  })
-  output$exoncovpysel <- renderUI({
-    selectInput('exoncovpy', 'Panel 2', dbxn$panelNames, selected = dbxn$panelNames[2])
+  output$exoncomp_panelsel <- renderUI({
+    selectInput('exoncomp_panel', 'Panels (choose multiple)', dbxn$panelNames, selected = dbxn$panelNames[1], multiple = T)
   })
   output$exoncovgsel <- renderUI({
     selectInput('exoncovg', 'Gene', exoncovd()[["group_name"]], selected = exoncovd()[["group_name"]][1])
   })
   output$exoncovtsel <- renderUI({
-    selectInput('exoncovt', 'Transcript', exoncovd2()[["transcript"]], selected = exoncovd()[["transcript"]][1])
+    selectInput('exoncovt', 'Transcript', exoncovd1()[["transcript"]], selected = exoncovd1()[["transcript"]][1])
+  })
+  output$sel_panelInspect <- renderUI({
+    selectInput('panelInspect', "Select Panel", dbxn$panelNames, selected = dbxn$panelNames[1], size = 25, selectize = F)
   })
   
-  output$tableInfo <- renderText(paste("pcb: RefSeq protein coding bases",
-                                       "clv: ClinVar variants",
-                                       "cmc: CMC mutations",
-                                       "tot: total",
-                                       "cov: covered (excl. masked)",
-                                       "covp: covered % (excl. masked)",
-                                       "bl: masked / 'blacklisted'",
-                                       "covt: covered (incl. masked)",
-                                       "covtp: covered % (incl. masked)",
-                                       "ncov: not covered (excl. masked)", sep = "\n \n" ))
+  output$sel_tablePanels <- renderUI({
+    selectInput('tablePanels', 'Panels (choose multiple)', dbxn$panelNames, selected = dbxn$panelNames[1], multiple = T)
+  })
   
-  output$tableInfo2 <- renderText(paste("pcb: RefSeq protein coding bases",
-                                        "clv: ClinVar variants",
-                                        "cmc: CMC mutations",
-                                        "tot: total",
-                                        "cov: covered (excl. masked)",
-                                        "covp: covered % (excl. masked)",
-                                        "bl: masked / 'blacklisted'",
-                                        "covt: covered (incl. masked)",
-                                        "covtp: covered % (incl. masked)",
-                                        "ncov: not covered (excl. masked)", sep = "\n \n" ))
-  
+  output$catpic <- renderImage(list(src = "cats.png", width = 600, height = 400), deleteFile = F)
   
   # processed data download -------------------------------------------------
   
@@ -475,7 +540,7 @@ server <- function(input, output) {
     if(is.null(input$panelUp$datapath)) {
       shinyalert(title = "No panel file selected for upload!")
     } else {
-      if (panelUpFile()[["panelName"]] %in% dbx2$panel) {
+      if (panelUpFile()[["panelName"]] %in% names(dbx)) {
         shinyalert(title = "Panel with same name is already loaded")
       } else {
         # update panel dbx
@@ -494,17 +559,6 @@ server <- function(input, output) {
         }
         all_genes <<- data.frame("gene" = sort(unique(all_genes)))
         
-        # combine paneltables into one table
-        dbx2 <<- cbind(data.frame("panel" = rep(dbx[[1]][["panelName"]], nrow(all_genes))),
-                       left_join(all_genes, dbx[[1]][["panelTable"]]))
-        if (length(dbx) > 1) {
-          for (i in 2:length(dbx)) {
-            dbx2 <<- rbind(dbx2, 
-                           cbind(data.frame("panel" = rep(dbx[[i]][["panelName"]], nrow(all_genes))),
-                                 left_join(all_genes, dbx[[i]][["panelTable"]])))
-          }
-        }
-        
         dbxn$panelNames <- c(dbxn$panelNames, panelUpFile()[["panelName"]])
         dbxn$geneNames <- all_genes
         shinyalert(title = "complete")
@@ -518,13 +572,18 @@ server <- function(input, output) {
   
   # scatter data
   scatter_data <- reactive({
-    scatter_dat <- data.frame("x" = dbx2[dbx2$panel == input$xpanel,input$xcol],
-                              "y" = dbx2[dbx2$panel == input$ypanel,input$ycol],
-                              "gene" = dbx2[dbx2$panel == input$ypanel,"gene"])
+    validate(
+      need(input$xpanel, 'Please select panel X'),
+      need(input$ypanel, 'Please select panel Y')
+    )
+    temp <- rbindlist(sapply(dbx[c(input$xpanel, input$ypanel)], "[", "panelTable"), idcol = "panel") %>%
+      mutate(panel = gsub(".panelTable","",panel))
     
-    scatter_dat$x[(is.na(scatter_dat$x) &  !is.na(scatter_dat$y))] <- 0
-    scatter_dat$y[(is.na(scatter_dat$y) &  !is.na(scatter_dat$x))] <- 0
-    scatter_dat
+    temp <- full_join(data.frame(gene = temp[panel == input$xpanel][["gene"]],
+                                 x = temp[panel == input$xpanel][[inputxyc$code[match(input$xcol, inputxyc$display)]]]),
+                      data.frame(gene = temp[panel == input$ypanel][["gene"]],
+                                 y = temp[panel == input$ypanel][[inputxyc$code[match(input$ycol, inputxyc$display)]]])) %>% replace(is.na(.),0)
+    temp
   })
   # scatter plots
   output$plot1 <- renderPlotly(
@@ -568,33 +627,36 @@ server <- function(input, output) {
   
   # bar data 
   bars_cov <- reactive({
-    bars_cov1 <- dbx2 %>% filter(panel %in% input$panelbar & !is.na(pcb_tot)) %>% filter (case_when(input$dtset == "ClinVar" ~ clv_tot != 0,
-                                                                                                    input$dtset == "RefSeq" ~ !is.na(pcb_tot),
-                                                                                                    input$dtset == "COSMIC" ~ cmc_tot != 0)) %>% 
+    validate(
+      need(input$panelbar, 'Please select at least one panel!'),
+    )
+    bars_cov1 <- rbindlist(sapply(dbx[input$panelbar], "[", "panelTable"), idcol = "panel") %>%
+      filter (case_when(input$dtset == "ClinVar mutations" ~ clv_tot != 0,
+                        input$dtset == "RefSeq coding bases" ~ !is.na(pcb_tot),
+                        input$dtset == "COSMIC mutations" ~ cmc_tot != 0)) %>% 
       as_tibble() %>% 
       mutate_at(c("panel", "gene"), as.factor) %>% 
-      complete(panel,gene)
-    
+      complete(panel,gene) %>%
+      mutate(panel = gsub(".panelTable","",panel))
     bars_cov1 <- left_join(bars_cov1, bars_cov1 %>%
                              replace(is.na(.), 0) %>%
-                             #replace(is.nan(.), 0) %>%
                              group_by(gene)%>%
-                             summarise(minFC = case_when(input$dtset == "RefSeq" ~ max(pcb_covp) / min(pcb_covp),
-                                                         input$dtset == "ClinVar" ~ max(clv_covp) / min(clv_covp),
-                                                         input$dtset == "COSMIC" ~ max(cmc_covp) / min(cmc_covp)),
-                                       total = case_when(input$dtset == "RefSeq" ~ max(pcb_tot),
-                                                         input$dtset == "ClinVar" ~ max(clv_tot),
-                                                         input$dtset == "COSMIC" ~ max(cmc_tot)),
-                                       ratio = case_when(input$dtset == "RefSeq" ~ pcb_covp[panel == input$panelbar[1]]/pcb_covp[panel == input$panelbar[2]],
-                                                         input$dtset == "ClinVar" ~ clv_covp[panel == input$panelbar[1]]/clv_covp[panel == input$panelbar[2]],
-                                                         input$dtset == "COSMIC" ~ cmc_covp[panel == input$panelbar[1]]/cmc_covp[panel == input$panelbar[2]]),
-                                       max_cov = case_when(input$dtset == "RefSeq" ~ max(pcb_cov),
-                                                           input$dtset == "ClinVar" ~ max(clv_cov),
-                                                           input$dtset == "COSMIC" ~ max(cmc_cov)),
-                                       max_covp = case_when(input$dtset == "RefSeq" ~ max(pcb_covp),
-                                                            input$dtset == "ClinVar" ~ max(clv_covp),
-                                                            input$dtset == "COSMIC" ~ max(cmc_covp)))) %>%
-      filter(minFC > as.numeric(input$diff_filter) | is.nan(minFC))
+                             summarise(minFC = case_when(input$dtset == "RefSeq coding bases" ~ max(pcb_covp) / min(pcb_covp),
+                                                         input$dtset == "ClinVar mutations" ~ max(clv_covp) / min(clv_covp),
+                                                         input$dtset == "COSMIC mutations" ~ max(cmc_covp) / min(cmc_covp)),
+                                       total = case_when(input$dtset == "RefSeq coding bases" ~ max(pcb_tot),
+                                                         input$dtset == "ClinVar mutations" ~ max(clv_tot),
+                                                         input$dtset == "COSMIC mutations" ~ max(cmc_tot)),
+                                       ratio = case_when(input$dtset == "RefSeq coding bases" ~ pcb_covp[panel == input$panelbar[1]]/pcb_covp[panel == input$panelbar[2]],
+                                                         input$dtset == "ClinVar mutations" ~ clv_covp[panel == input$panelbar[1]]/clv_covp[panel == input$panelbar[2]],
+                                                         input$dtset == "COSMIC mutations" ~ cmc_covp[panel == input$panelbar[1]]/cmc_covp[panel == input$panelbar[2]]),
+                                       max_cov = case_when(input$dtset == "RefSeq coding bases" ~ max(pcb_cov),
+                                                           input$dtset == "ClinVar mutations" ~ max(clv_cov),
+                                                           input$dtset == "COSMIC mutations" ~ max(cmc_cov)),
+                                       max_covp = case_when(input$dtset == "RefSeq coding" ~ max(pcb_covp),
+                                                            input$dtset == "ClinVar mutations" ~ max(clv_covp),
+                                                            input$dtset == "COSMIC mutations" ~ max(cmc_covp)))) %>%
+      filter(minFC >= as.numeric(input$diff_filter) | is.nan(minFC))
     
     if (input$vsort != "gene") {
       bars_cov1$gene <- reorder(bars_cov1$gene, bars_cov1[[input$vsort]])
@@ -610,9 +672,9 @@ server <- function(input, output) {
     bars_cov() %>%
       replace(is.na(.), 0) %>%
       group_by(gene)%>%
-      summarise(width = max(case_when(input$dtset == "RefSeq" ~ pcb_tot,
-                                      input$dtset == "ClinVar" ~ clv_tot,
-                                      input$dtset == "COSMIC" ~ cmc_tot)))
+      summarise(width = max(case_when(input$dtset == "RefSeq coding bases" ~ pcb_tot,
+                                      input$dtset == "ClinVar mutations" ~ clv_tot,
+                                      input$dtset == "COSMIC mutations" ~ cmc_tot)))
   })
   
   bars_colvec <- reactive({
@@ -630,27 +692,27 @@ server <- function(input, output) {
       geom_col(d = bars_tot(), aes(x = gene, y = case_when(input$dtsetrel == "absolute" ~ width,
                                                            input$dtsetrel == "relative" ~ 1),
                                    fill = "total")) +
-      geom_col(d = bars_cov(), aes(x = gene, y = case_when(input$dtset == "RefSeq" & input$dtsetrel == "absolute" ~ pcb_covt,
-                                                           input$dtset == "ClinVar" & input$dtsetrel == "absolute" ~ clv_covt,
-                                                           input$dtset == "COSMIC" & input$dtsetrel == "absolute" ~ cmc_covt,
-                                                           input$dtset == "RefSeq" & input$dtsetrel == "relative" ~ pcb_covtp,
-                                                           input$dtset == "ClinVar" & input$dtsetrel == "relative" ~ clv_covtp,
-                                                           input$dtset == "COSMIC" & input$dtsetrel == "relative" ~ cmc_covtp)
-                                   , fill = panel), position = "dodge", alpha = 0.3) +
-      geom_col(d = bars_cov(), aes(x = gene,  y = case_when(input$dtset == "RefSeq" & input$dtsetrel == "absolute" ~ pcb_cov,
-                                                            input$dtset == "ClinVar" & input$dtsetrel == "absolute" ~ clv_cov,
-                                                            input$dtset == "COSMIC" & input$dtsetrel == "absolute" ~ cmc_cov,
-                                                            input$dtset == "RefSeq" & input$dtsetrel == "relative" ~ pcb_covp,
-                                                            input$dtset == "ClinVar" & input$dtsetrel == "relative" ~ clv_covp,
-                                                            input$dtset == "COSMIC" & input$dtsetrel == "relative" ~ cmc_covp), 
-                                   fill = panel), position = "dodge") +
-      ylab(case_when(input$dtset == "RefSeq" & input$dtsetrel == "absolute" ~ "protein coding bases, absolute",
-                     input$dtset == "ClinVar" & input$dtsetrel == "absolute" ~ "ClinVar variants, absolute",
-                     input$dtset == "COSMIC" & input$dtsetrel == "absolute" ~ "COSMIC mutations, absolute",
-                     input$dtset == "RefSeq" & input$dtsetrel == "relative" ~ "protein coding bases, relative",
-                     input$dtset == "ClinVar" & input$dtsetrel == "relative" ~ "ClinVar variants, relative",
-                     input$dtset == "COSMIC" & input$dtsetrel == "relative" ~ "COSMIC mutations, absolute")) +
-      theme_minimal() +
+      geom_col(d = bars_cov(), aes(x = gene, y = case_when(input$dtset == "RefSeq coding bases" & input$dtsetrel == "absolute" ~ pcb_covt,
+                                                           input$dtset == "ClinVar mutations" & input$dtsetrel == "absolute" ~ clv_covt,
+                                                           input$dtset == "COSMIC mutations" & input$dtsetrel == "absolute" ~ cmc_covt,
+                                                           input$dtset == "RefSeq coding bases" & input$dtsetrel == "relative" ~ pcb_covtp,
+                                                           input$dtset == "ClinVar mutations" & input$dtsetrel == "relative" ~ clv_covtp,
+                                                           input$dtset == "COSMIC mutations" & input$dtsetrel == "relative" ~ cmc_covtp)
+                                   , fill = panel), position = "dodge", alpha = 0.5) +
+      geom_col(d = bars_cov(), aes(x = gene,  y = case_when(input$dtset == "RefSeq coding bases" & input$dtsetrel == "absolute" ~ pcb_cov,
+                                                            input$dtset == "ClinVar mutations" & input$dtsetrel == "absolute" ~ clv_cov,
+                                                            input$dtset == "COSMIC mutations" & input$dtsetrel == "absolute" ~ cmc_cov,
+                                                            input$dtset == "RefSeq coding bases" & input$dtsetrel == "relative" ~ pcb_covp,
+                                                            input$dtset == "ClinVar mutations" & input$dtsetrel == "relative" ~ clv_covp,
+                                                            input$dtset == "COSMIC mutations" & input$dtsetrel == "relative" ~ cmc_covp), 
+                                   fill = panel), color = "black", size = 0.1, position = "dodge") +
+      ylab(case_when(input$dtset == "RefSeq coding bases" & input$dtsetrel == "absolute" ~ "protein coding bases, absolute",
+                     input$dtset == "ClinVar mutations" & input$dtsetrel == "absolute" ~ "ClinVar variants, absolute",
+                     input$dtset == "COSMIC mutations" & input$dtsetrel == "absolute" ~ "COSMIC mutations, absolute",
+                     input$dtset == "RefSeq coding bases" & input$dtsetrel == "relative" ~ "protein coding bases, relative",
+                     input$dtset == "ClinVar mutations" & input$dtsetrel == "relative" ~ "ClinVar variants, relative",
+                     input$dtset == "COSMIC mutations" & input$dtsetrel == "relative" ~ "COSMIC mutations, relative")) +
+      theme_minimal(base_size = 15) +
       coord_flip() +
       scale_fill_manual(values = bars_colvec(),
                         guide = guide_legend(reverse=T)) +
@@ -665,7 +727,12 @@ server <- function(input, output) {
   
   # bar data 
   bars_gene <- reactive({
-    dbx2[dbx2$panel %in% input$panelgenes & dbx2$gene %in% input$genes & !is.na(dbx2$pcb_tot),] %>% 
+    rbindlist(sapply(dbx[input$panelgenes], "[", "panelTable"), idcol = "panel") %>%
+      filter(gene %in% input$genes) %>%
+      mutate(panel = gsub(".panelTable","",panel)) %>%
+      filter (case_when(input$dtset == "ClinVar mutations" ~ clv_tot != 0,
+                        input$dtset == "RefSeq coding bases" ~ !is.na(pcb_tot),
+                        input$dtset == "COSMIC mutations" ~ cmc_tot != 0)) %>% 
       as_tibble() %>% 
       mutate_at(c("panel", "gene"), as.factor) %>% 
       complete(panel,gene)
@@ -675,9 +742,9 @@ server <- function(input, output) {
     bars_gene() %>%
       replace(is.na(.), 0) %>%
       group_by(gene)%>%
-      summarise(width = max(case_when(input$dtsetgenes == "RefSeq" & input$dtsetrelg == "absolute" ~ pcb_tot,
-                                      input$dtsetgenes == "ClinVar" & input$dtsetrelg == "absolute" ~ clv_tot,
-                                      input$dtsetgenes == "COSMIC" & input$dtsetrelg == "absolute" ~ cmc_tot,
+      summarise(width = max(case_when(input$dtsetgenes == "RefSeq coding bases" & input$dtsetrelg == "absolute" ~ pcb_tot,
+                                      input$dtsetgenes == "ClinVar mutations" & input$dtsetrelg == "absolute" ~ clv_tot,
+                                      input$dtsetgenes == "COSMIC mutations" & input$dtsetrelg == "absolute" ~ cmc_tot,
                                       input$dtsetrelg == "relative" ~ 1)))
   })
   
@@ -696,25 +763,31 @@ server <- function(input, output) {
     ggplotly(
       ggplot() +
         geom_col(d = genes_tot(), aes(x = gene, y = width, fill = "total")) +
-        geom_col(d = bars_gene(), aes(x = gene, y = case_when(input$dtsetgenes == "RefSeq" & input$dtsetrelg == "absolute" ~ pcb_covt,
-                                                              input$dtsetgenes == "ClinVar" & input$dtsetrelg == "absolute" ~ clv_covt,
-                                                              input$dtsetgenes == "COSMIC" & input$dtsetrelg == "absolute" ~ cmc_covt,
-                                                              input$dtsetgenes == "RefSeq" & input$dtsetrelg == "relative" ~ pcb_covtp,
-                                                              input$dtsetgenes == "ClinVar" & input$dtsetrelg == "relative" ~ clv_covtp,
-                                                              input$dtsetgenes == "COSMIC" & input$dtsetrelg == "relative" ~ cmc_covtp), 
+        geom_col(d = bars_gene(), aes(x = gene, y = case_when(input$dtsetgenes == "RefSeq coding bases" & input$dtsetrelg == "absolute" ~ pcb_covt,
+                                                              input$dtsetgenes == "ClinVar mutations" & input$dtsetrelg == "absolute" ~ clv_covt,
+                                                              input$dtsetgenes == "COSMIC mutations" & input$dtsetrelg == "absolute" ~ cmc_covt,
+                                                              input$dtsetgenes == "RefSeq coding bases" & input$dtsetrelg == "relative" ~ pcb_covtp,
+                                                              input$dtsetgenes == "ClinVar mutations" & input$dtsetrelg == "relative" ~ clv_covtp,
+                                                              input$dtsetgenes == "COSMIC mutations" & input$dtsetrelg == "relative" ~ cmc_covtp), 
                                       fill = panel), position = "dodge", alpha = 0.3) +
-        geom_col(d = bars_gene(), aes(x = gene,  y = case_when(input$dtsetgenes == "RefSeq" & input$dtsetrelg == "absolute" ~ pcb_cov,
-                                                               input$dtsetgenes == "ClinVar" & input$dtsetrelg == "absolute" ~ clv_cov,
-                                                               input$dtsetgenes == "COSMIC" & input$dtsetrelg == "absolute" ~ cmc_cov,
-                                                               input$dtsetgenes == "RefSeq" & input$dtsetrelg == "relative" ~ pcb_covp,
-                                                               input$dtsetgenes == "ClinVar" & input$dtsetrelg == "relative" ~ clv_covp,
-                                                               input$dtsetgenes == "COSMIC" & input$dtsetrelg == "relative" ~ cmc_covp), 
+        geom_col(d = bars_gene(), aes(x = gene,  y = case_when(input$dtsetgenes == "RefSeq coding bases" & input$dtsetrelg == "absolute" ~ pcb_cov,
+                                                               input$dtsetgenes == "ClinVar mutations" & input$dtsetrelg == "absolute" ~ clv_cov,
+                                                               input$dtsetgenes == "COSMIC mutations" & input$dtsetrelg == "absolute" ~ cmc_cov,
+                                                               input$dtsetgenes == "RefSeq coding bases" & input$dtsetrelg == "relative" ~ pcb_covp,
+                                                               input$dtsetgenes == "ClinVar mutations" & input$dtsetrelg == "relative" ~ clv_covp,
+                                                               input$dtsetgenes == "COSMIC mutations" & input$dtsetrelg == "relative" ~ cmc_covp), 
                                       fill = panel), position = "dodge") +
-        theme_minimal() +
+        ylab(case_when(input$dtsetgenes == "RefSeq coding bases" & input$dtsetrelg == "absolute" ~ "protein coding bases, absolute",
+                       input$dtsetgenes == "ClinVar mutations" & input$dtsetrelg == "absolute" ~ "ClinVar variants, absolute",
+                       input$dtsetgenes == "COSMIC mutations" & input$dtsetrelg == "absolute" ~ "COSMIC mutations, absolute",
+                       input$dtsetgenes == "RefSeq coding bases" & input$dtsetrelg == "relative" ~ "protein coding bases, relative",
+                       input$dtsetgenes == "ClinVar mutations" & input$dtsetrelg == "relative" ~ "ClinVar variants, relative",
+                       input$dtsetgenes == "COSMIC mutations" & input$dtsetrelg == "relative" ~ "COSMIC mutations, relative")) +
+        theme_minimal(base_size = 15) +
         coord_flip() +
         ggtitle("Coverage (opaque) / masked (shaded)") +
         scale_fill_manual(values = genes_colvec()) %>% reverse_legend_labels(),
-      height = case_when((10 * length(input$genes) * length(input$panelgenes)) < 300 ~ 300,
+      height = case_when((10 * length(input$genes) * length(input$panelgenes)) <= 300 ~ 300,
                          (10 * length(input$genes) * length(input$panelgenes)) > 300 ~ (10 * length(input$genes) * length(input$panelgenes)))
     )
   })
@@ -750,7 +823,8 @@ server <- function(input, output) {
     ggplotly(
       ggplot(d = nCovPosRate_df(), aes(x = panel, y = value, fill = variable)) +
         geom_col(position = position_dodge2(preserve = "single")) +
-        theme_minimal() +
+        ylab("No. of cases with mutations outside of target regions (per 100 cases)") +
+        theme_minimal(base_size = 15) +
         coord_flip()
     )})  
   
@@ -758,87 +832,89 @@ server <- function(input, output) {
   # Exon coverage table -----------------------------------------------------
   
   table_exons <- reactive({
-    createExonTable()
-    left_join(dbx[[input$expanel]][["exon_coverage"]], ex_by_ge_df1) %>% mutate(covp = cov_width / width)
+    loadExDb()
+    left_join(dbx[[input$expanel]][["exon_coverage"]], ex_by_ge_df1) %>% 
+      mutate(covp = cov_width / width, covtp = covt_width / width, group_name = as.factor(group_name), transcript = as.factor(transcript))
   })
   
   output$exons <- DT::renderDataTable({
     DT::datatable(table_exons(),
                   filter = list(position = "top", clear = F),
-                  options = list(search = list(regex = TRUE, caseInsensitive = T)))
+                  options = list(search = list(regex = TRUE, caseInsensitive = T), iDisplayLength = 100))
   })
-  
-  #  output$download <- downloadHandler(
-  #    filename = function(){"thename.csv"}, 
-  #    content = function(fname){
-  #      write.csv(thedata(), fname)
-  #    }
-  #  )
-  
   
   # Exon coverage graph -----------------------------------------------------
   
   exoncovd <- reactive({
-    createExonTable()
-    full_join(dbx[[input$exoncovpx]][["exon_coverage"]],
-              dbx[[input$exoncovpy]][["exon_coverage"]], 
-              by = c("group_name","seqnames","start","end","strand","width"))
+    loadExDb()
+    rbindlist(sapply(dbx[input$exoncomp_panel], "[", "exon_coverage"), idcol = "panel")
   })
   
   exoncovd1 <- reactive({
-    exoncovd() %>% filter(group_name == input$exoncovg)
+    exoncovd() %>% filter(group_name == input$exoncovg) %>%
+      left_join(ex_by_ge_df1, relationship = "many-to-many")
   })
   
   exoncovd2 <- reactive({
-    left_join(exoncovd1(), ex_by_ge_df1)
+    exoncovd1() %>% filter(transcript == input$exoncovt) %>%
+      mutate(covp = cov_width / width, covtp = covt_width / width, exon = as.factor(exon))
   })
   
-  exoncovd3 <- reactive({
-    exoncov <- exoncovd2() %>% filter(transcript == input$exoncovt)
-    names(exoncov)[names(exoncov) == "cov_width.x"] <- input$exoncovpx
-    names(exoncov)[names(exoncov) == "cov_width.y"] <- input$exoncovpy
-    exoncov <- melt(exoncov, id.vars = c("group_name","seqnames","start","end","strand","width","transcript","exon_id","exon"))
-    exoncov$covp <- exoncov$value / exoncov$width
-    exoncov
+  exons_colvec <- reactive({
+    setNames(c("grey95",distinctColorPalette(length(input$exoncomp_panel))),
+             c("total",unique(exoncovd2()[["panel"]])))
   })
   
-  output$exonCompP <- renderPlot({
-    #validate(
-    #  need(input$panelbar, 'Please select at least one panel!'),
-    #)
-    ggplot(d = exoncovd3(), aes(x = variable, y = covp, label = exon)) +
-      geom_violin() +
-      geom_jitter(position = position_jitter(seed = 1, height = 0)) +
-      geom_text_repel(position = position_jitter(seed = 1)) +
-      theme_minimal() +
-      ylab(paste(input$exoncovg, " exon base coverage, %")) +
-      xlab("panel")
+  output$exonCompP <- renderPlotly({
+    validate(
+      need(input$exoncomp_panel, 'Please select at least one panel'),
+      need(input$exoncovg, 'Please select one gene'),
+      need(input$exoncovt, 'Please select one trx')
+    )
+    ggplotly(
+      ggplot() +
+        geom_col(d = exoncovd2() %>% 
+                   group_by(exon) %>%
+                   summarise(width = max(width)), aes(x = exon, y = case_when(input$exoncomp_rel == "absolute" ~ width,
+                                                                              input$exoncomp_rel == "relative" ~ 1),
+                                                      fill = "total")) +
+        geom_col(d = exoncovd2(), aes(x = exon, y = case_when(input$exoncomp_rel == "absolute" ~ covt_width,
+                                                              input$exoncomp_rel == "relative" ~ covtp),
+                                      fill = panel), position = "dodge", alpha = 0.2) +
+        geom_col(d = exoncovd2(), aes(x = exon, y = case_when(input$exoncomp_rel == "absolute" ~ cov_width,
+                                                              input$exoncomp_rel == "relative" ~ covp), 
+                                      fill = panel), color = "black", size = 0.05, position = "dodge") +
+        ylab(case_when(input$exoncomp_rel == "absolute" ~ "Exon coverage, basepairs",
+                       input$exoncomp_rel == "relative" ~ "Exon coverage, % bp")) +
+        theme_minimal() +
+        coord_flip() +
+        ggtitle("Coverage (opaque) / masked (shaded)") +
+        scale_fill_manual(values = exons_colvec()) %>% reverse_legend_labels(),
+      height = case_when((10 * length(unique(exoncovd2()[["exon"]])) * length(input$exoncomp_panel)) <= 300 ~ 400,
+                         (10 * length(unique(exoncovd2()[["exon"]])) * length(input$exoncomp_panel)) > 300 ~ (12 * length(unique(exoncovd2()[["exon"]])) * length(input$exoncomp_panel)))
+    )
   })
   
   # COSMIC coverage table -------------------------------------------------
   
   table_muts <- reactive({
-    if (!exists("cmc_ori")) {
-      withProgress(message = "Preparation", value = 0, max = 4, {
-        loadCosmic(updateDb = FALSE)
-      })
-    }
+    loadCosmic()
+    sqldb_cosmic <- dbConnect(SQLite(), dbname=cmc_path)
     gr_test <- GRanges(dbx[[input$mutpanel]][["panelBed_input"]][["V1"]],
                        IRanges(
                          dbx[[input$mutpanel]][["panelBed_input"]][["V2"]],
                          dbx[[input$mutpanel]][["panelBed_input"]][["V3"]]))
-    gr_cmc <- GRanges(cmc_ori$chr, IRanges(cmc_ori$start, cmc_ori$end))
-    if (input$showCmcBl == F | length(dbx[[input$mutpanel]][["blacklist"]]) == 1) {
-      muts_overlaps <- findOverlaps(gr_test, gr_cmc)
-      cmc_ori[muts_overlaps@to]
+    if (input$hideCmcBl == T | length(dbx[[input$mutpanel]][["blacklist"]]) == 1) {
+      muts_overlaps <- findOverlaps(gr_test, gr_cmc)@to
+      dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')'))
     } else {
       gr_bl <- GRanges(dbx[[input$mutpanel]][["blacklist"]][["V1"]],
                        IRanges(
                          dbx[[input$mutpanel]][["blacklist"]][["V2"]],
                          dbx[[input$mutpanel]][["blacklist"]][["V3"]]))
-      gr_test_bl <- unlist(subtract(gr_test, gr_bl))
-      muts_overlaps <- findOverlaps(gr_test_bl, gr_cmc)
-      cmc_ori[muts_overlaps@to]
+      gr_test_bl <- unlist(GenomicRanges::subtract(gr_test, gr_bl))
+      muts_overlaps <- findOverlaps(gr_test_bl, gr_cmc)@to
+      dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')'))
     }
   })
   
@@ -852,27 +928,25 @@ server <- function(input, output) {
   
   
   table_clvmuts <- reactive({
-    if (!exists("clinvar")) {
-      withProgress(message = "Preparation", value = 0, max = 4, {
-        loadClinVar(updateDb = FALSE)
-      })
-    }
+    loadClinVar(updateDb = FALSE)
+    sqldb_clinvar <<- dbConnect(SQLite(), dbname=clv_path)
     gr_test <- GRanges(dbx[[input$clvpanel]][["panelBed_input"]][["V1"]],
                        IRanges(
                          dbx[[input$clvpanel]][["panelBed_input"]][["V2"]],
                          dbx[[input$clvpanel]][["panelBed_input"]][["V3"]]))
-    gr_clinvar <- GRanges(clinvar$`#CHROM`, IRanges(clinvar$POS, (clinvar$POS+(nchar(clinvar$REF)-1))))
-    if (input$showClvBl == F | length(dbx[[input$clvpanel]][["blacklist"]]) == 1) {
-      muts_overlaps <- findOverlaps(gr_test, gr_clinvar)
-      clinvar[muts_overlaps@to,]
+    if (input$hideClvBl == T | length(dbx[[input$clvpanel]][["blacklist"]]) == 1) {
+      muts_overlaps <- findOverlaps(gr_test, gr_clinvar)@to
+      dbGetQuery(sqldb_clinvar, paste0('SELECT * FROM clinvar WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
+        mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat))
     } else {
       gr_bl <- GRanges(dbx[[input$clvpanel]][["blacklist"]][["V1"]],
                        IRanges(
                          dbx[[input$clvpanel]][["blacklist"]][["V2"]],
                          dbx[[input$clvpanel]][["blacklist"]][["V3"]]))
-      gr_test_bl <- unlist(subtract(gr_test, gr_bl))
+      gr_test_bl <- unlist(GenomicRanges::subtract(gr_test, gr_bl))
       muts_overlaps <- findOverlaps(gr_test_bl, gr_clinvar)
-      clinvar[muts_overlaps@to,]
+      dbGetQuery(sqldb_clinvar, paste0('SELECT * FROM clinvar WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
+        mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat))
     }
   })
   
@@ -886,8 +960,12 @@ server <- function(input, output) {
   # Panel coverage Tables ------------------------------------------------------------------
   
   table_output <- reactive({
-    table <- dcast(as.data.table(dbx2[dbx2$panel %in% input$tablePanels,]), gene~panel, value.var = input$tableVars)
+    table <- dcast(rbindlist(sapply(dbx[input$tablePanels], "[", "panelTable"), idcol = "panel") %>%
+                     mutate(panel = gsub(".panelTable","",panel)),
+                   gene~panel, value.var = inputxyc$code[match(input$tableVars, inputxyc$display)])
     table <- table[apply(table, 1, count_nna_func) > 1,]
+    tablenames <- expand.grid(input$tablePanels, input$tableVars)
+    colnames(table) <- c("gene", paste(tablenames$Var1, tablenames$Var2))
     table
   })
   
@@ -1000,7 +1078,7 @@ server <- function(input, output) {
     }
     
     
-    if (input$pName %in% dbx2$panel) {
+    if (input$pName %in% names(dbx)) {
       shinyalert(title = "Panel Name already in use. Please provide a new unique name.")
     } else if (is.null(input$pName)) {
       shinyalert(title = "Please provide a new unique panel name.")
@@ -1010,17 +1088,16 @@ server <- function(input, output) {
       shinyalert(title = "Specified mask file columns contain non-numeric entries. Please review.")
     } else {
       
-      withProgress(message = "", value = 0, max = 8, {
+      withProgress(message = "Processing", {
         # load databases
-        loadRefSeq(updateDb = FALSE)
-        loadClinVar(updateDb = FALSE)
-        loadCosmic(updateDb = FALSE)
-        cmc <- cmc_ori[cmc_ori$MUTATION_SIGNIFICANCE_TIER != "Other",]
+        loadRefSeq(force = F)
+        prepClinvar(updateDb = F)
+        prepCosmic()
         
         # make Granges of panel
         trget$V2 <- as.numeric(trget$V2)
         trget$V3 <- as.numeric(trget$V3)
-        gr_test <- GRanges(trget$V1, IRanges(trget$V2, trget$V3))
+        gr_test <- reduce(GRanges(trget$V1, IRanges(trget$V2, trget$V3)))
         
         # make blacklist ranges
         if (!is.null(panelInput$mask)) {
@@ -1032,35 +1109,38 @@ server <- function(input, output) {
         
         gr_test_bl <- reduce(unlist(subtract(gr_test, gr_blacklist)))
         
-        #find overlapping exons in txdb
-        incProgress(1, detail = "Find targeted exons")
-        ex_by_ge_overlap <- findOverlaps(gr_test, unlist(ex_by_ge)) 
-        ex_by_ge_overlap <- unlist(ex_by_ge)[ex_by_ge_overlap@to]
-        gl_exp <<- data.frame("refseq" = unique(names(ex_by_ge_overlap)))
+        incProgress(0.1, detail = "Find targeted exons")
+        
+        ### RefSeq
+        # find target genes
+        gl_exp <- data.frame("refseq" = unique(names(unlist(ex_by_ge)[findOverlaps(gr_test, unlist(ex_by_ge))@to])))
         
         # identify unique exons and their coverage
-        
-        incProgress(1, detail = "Find unique exon coverage (optional)")
-        gr_test_red <- reduce(gr_test)
+        incProgress(0.1, detail = "Find unique exon coverage (optional)")
         exons <- ex_by_ge[names(ex_by_ge) %in% gl_exp$refseq]
-        ex_fo <- findOverlaps(gr_test_red, exons)
+        ex_fo <- findOverlaps(gr_test, exons)
+        ex_fo_bl <- findOverlaps(gr_test_bl, exons)
         ex_by_ge_all_df <- subset(
-          left_join(as.data.table(exons),
-                    as.data.table(pintersect(gr_test_red[queryHits(ex_fo)], exons[subjectHits(ex_fo)])) %>% 
-                      filter(hit == T) %>%
-                      group_by(exon_id) %>%
-                      summarise(cov_width = sum(width)),
-                    by = "exon_id"),
-          select = c(group_name, seqnames, start, end, strand, width, cov_width)) %>%
+          left_join(as.data.table(exons), left_join(
+            as.data.table(pintersect(gr_test[queryHits(ex_fo)], exons[subjectHits(ex_fo)])) %>% 
+              filter(hit == T) %>%
+              group_by(exon_id) %>%
+              summarise(covt_width = sum(width)),
+            as.data.table(pintersect(gr_test_bl[queryHits(ex_fo_bl)], exons[subjectHits(ex_fo_bl)])) %>% 
+              filter(hit == T) %>%
+              group_by(exon_id) %>%
+              summarise(cov_width = sum(width))),
+          by = "exon_id"),
+          select = c(group_name, seqnames, start, end, strand, width, covt_width, cov_width)) %>%
           distinct() %>%
           replace(is.na(.), 0)
         
         # reduce exon ranges
-        incProgress(1, detail = "Reducing exon GRanges")
+        incProgress(0.1, detail = "Reducing exon GRanges")
         exons_red <- reduce(ex_by_ge[names(ex_by_ge) %in% gl_exp$refseq])
         
-        ex_fo1 <- findOverlaps(gr_test_red, exons_red)
-        ex_fo_pint1 <- pintersect(gr_test_red[queryHits(ex_fo1)], exons_red[subjectHits(ex_fo1)])
+        ex_fo1 <- findOverlaps(gr_test, exons_red)
+        ex_fo_pint1 <- pintersect(gr_test[queryHits(ex_fo1)], exons_red[subjectHits(ex_fo1)])
         table_refseq_cov <- as.data.table(ex_fo_pint1) %>% group_by(group_name) %>% summarise(pcb_covt = sum(width))
         
         ex_fo2 <- findOverlaps(gr_test_bl, exons_red)
@@ -1078,105 +1158,121 @@ server <- function(input, output) {
         table_refseq <- table_refseq[,c("gene","pcb_ncov","pcb_covt","pcb_bl","pcb_cov","pcb_tot","pcb_covp","pcb_covtp")]
         
         # CLINVAR TABLE
-        incProgress(1, detail = "Create ClinVar table")
-        
-        # filter clinvar to genes of test
-        clinvar_test <- clinvar[clinvar$gene %in% gl_exp$refseq,]
-        
-        # filter clinvar to pathogenic and likely pathogenic
-        clinvar_select <- clinvar_test[str_starts(clinvar_test$clnsig, "Pathogenic") | str_starts(clinvar_test$clnsig, "Likely_pathogenic"),]
-        table_clinvar_tot <- as.data.frame(table(clinvar_select$gene))
+        incProgress(0.1, detail = "Create ClinVar table")
         
         # create clinvar ranges and overlap with test ranges
-        gr_clinvar <- GRanges(clinvar_select$`#CHROM`, IRanges(clinvar_select$POS, (clinvar_select$POS+(nchar(clinvar_select$REF)-1))), 
-                              REF = clinvar_select$REF, ALT = clinvar_select$ALT)
+        sqldb_clinvar <- dbConnect(SQLite(), dbname=clv_path)
+        
+        clvlabs <- unique(dbGetQuery(sqldb_clinvar, paste0('select clnsig from clinvar'))[,1])
+        clvlabs <- clvlabs[str_starts(clvlabs, "Pathogenic") | str_starts(clvlabs, "Likely_pathogenic")]
+        
+        gr_clinvar <- GRanges(dbGetQuery(sqldb_clinvar, paste0('select CHROM from clinvar where (clnsig in (', paste(shQuote(clvlabs, type = "cmd"), collapse = ", "),') and gene in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))[,1],
+                              IRanges(dbGetQuery(sqldb_clinvar, paste0('select POS from clinvar where (clnsig in (', paste(shQuote(clvlabs, type = "cmd"), collapse = ", "),') and gene in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))[,1],
+                                      dbGetQuery(sqldb_clinvar, paste0('select POS from clinvar where (clnsig in (', paste(shQuote(clvlabs, type = "cmd"), collapse = ", "),') and gene in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))[,1]+
+                                        (nchar(dbGetQuery(sqldb_clinvar, paste0('select REF from clinvar where (clnsig in (', paste(shQuote(clvlabs, type = "cmd"), collapse = ", "),') and gene in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))[,1])-1)))
+        
+        # total muts in targeted genes
+        clv_gene_id <- dbGetQuery(sqldb_clinvar, paste0('select gene, ID from clinvar where (clnsig in (', paste(shQuote(clvlabs, type = "cmd"), collapse = ", "),') and gene in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))
+        table_clv_tot <- as.data.frame(table(clv_gene_id$gene))
         
         # covered variants (excluding blacklisted)
-        clinvar_fo_bl <- findOverlaps(gr_clinvar, gr_test_bl, type = "within")
-        table_clinvar_covbl <- as.data.frame(table(distinct(clinvar_select[queryHits(clinvar_fo_bl),])[["gene"]]))
+        clv_fo_bl <- findOverlaps(gr_clinvar, gr_test_bl, type = "within")@from
+        clv_cov_bl <<- distinct(clv_gene_id[clv_fo_bl,])
+        table_clv_covbl <- as.data.frame(sort(table(clv_cov_bl$gene)))
         
-        # total and blacklisted variants
-        clinvar_fo <- findOverlaps(gr_clinvar, gr_test_red, type = "within")
-        table_clinvar_covt <- as.data.frame(table(distinct(clinvar_select[queryHits(clinvar_fo),])[["gene"]]))
-        
-        clinvar_fo_blonly <- findOverlaps(gr_clinvar, gr_blacklist, type = "within")
+        # total and specific blacklisted variants
+        clv_fo <- findOverlaps(gr_clinvar, gr_test, type = "within")@from
+        clv_cov <- distinct(clv_gene_id[clv_fo,])
+        table_clv_covt <- as.data.frame(table(clv_cov$gene))
+        clv_bl <- clv_cov[!(clv_cov$ID %in% clv_cov_bl$ID),]
+        #table_clv_bl <- as.data.frame(table(clv_bl$gene))
         if(!is.null(panelInput$mask)) {
-          table_clinvar_bl <- as.data.frame(table(distinct(clinvar_select[queryHits(clinvar_fo_blonly),])[["gene"]]))
+          table_clv_bl <- as.data.frame(clv_bl$gene)
         } else {
-          table_clinvar_bl <- data.frame("Var1" = gl_exp$refseq, "Freq" = 0)
+          table_clv_bl <- data.frame("Var1" = gl_exp$refseq, "Freq" = 0)
         }
         
         # NON covered variants (excluding blacklisted)
-        #clinvar_ncov <- distinct(clinvar_select[-unique(queryHits(clinvar_fo)),])[["gene"]]
-        table_clinvar_ncov <- as.data.frame(table(distinct(clinvar_select[-unique(queryHits(clinvar_fo)),])[["gene"]]))
+        clv_ncov <- clv_gene_id[!(clv_gene_id$ID %in% clv_cov$ID),]
+        if (nrow(clv_ncov) > 0) {
+          table_clv_ncov <- as.data.frame(table(clv_ncov$gene))
+        } else {
+          table_clv_ncov <- data.frame("Var1" = gl_exp$refseq, "Freq" = 0)
+        }
         
         # join tables
-        table_clinvar <<- left_join(
+        table_clv <- left_join(
           left_join(
             left_join(
               left_join(
-                full_join(data.frame("Var1" = gl_exp$refseq), table_clinvar_ncov, by = "Var1"),
-                table_clinvar_covt, by = "Var1"),
-              table_clinvar_bl, by = "Var1"),
-            table_clinvar_covbl, by = "Var1"),
-          table_clinvar_tot, by = "Var1")
-        colnames(table_clinvar) <- c("gene","clv_ncov","clv_covt","clv_bl","clv_cov","clv_tot")
-        table_clinvar$clv_covp <- table_clinvar$clv_cov/table_clinvar$clv_tot
-        table_clinvar$clv_covtp <- table_clinvar$clv_covt/table_clinvar$clv_tot
-        table_clinvar[is.na(table_clinvar)] <- 0
+                full_join(data.frame("Var1" = gl_exp$refseq), table_clv_ncov, by = "Var1"),
+                table_clv_covt, by = "Var1"),
+              table_clv_bl, by = "Var1"),
+            table_clv_covbl, by = "Var1"),
+          table_clv_tot, by = "Var1")
+        colnames(table_clv) <- c("gene","clv_ncov","clv_covt","clv_bl","clv_cov","clv_tot")
+        table_clv$clv_covp <- table_clv$clv_cov/table_clv$clv_tot
+        table_clv$clv_covtp <- table_clv$clv_covt/table_clv$clv_tot
+        table_clv[is.na(table_clv)] <- 0
         
         # Cosmic ------------------------------------------------------------------
-        incProgress(1, detail = "Create COSMIC table")
+        incProgress(0.3, detail = "Create COSMIC table")
         # make ranges, find overlap (blacklisted)
-        gr_cmc <<- GRanges(cmc$chr, IRanges(cmc$start, cmc$end))
+        
+        sqldb_cosmic <- dbConnect(SQLite(), dbname=cmc_path)
+        gr_cmc <-  GRanges(dbGetQuery(sqldb_cosmic, paste0('select chr from cosmic where (MUTATION_SIGNIFICANCE_TIER != "Other" and GENE_NAME in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))[,1],
+                           IRanges(dbGetQuery(sqldb_cosmic, paste0('select start from cosmic where (MUTATION_SIGNIFICANCE_TIER != "Other" and GENE_NAME in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))[,1],
+                                   dbGetQuery(sqldb_cosmic, paste0('select end from cosmic where (MUTATION_SIGNIFICANCE_TIER != "Other" and GENE_NAME in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))[,1]))
+        
         
         # total muts in targeted genes
-        cmc_test <<- cmc[cmc$GENE_NAME %in% gl_exp$refseq]
-        table_cmc_tot <<- as.data.frame(table(cmc_test$GENE_NAME))
+        cmc_gene_id <- dbGetQuery(sqldb_cosmic, paste0('select GENE_NAME, GENOMIC_MUTATION_ID, COSMIC_SAMPLE_POSRATE from cosmic where (MUTATION_SIGNIFICANCE_TIER != "Other" and GENE_NAME in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))
+        table_cmc_tot <- as.data.frame(table(cmc_gene_id$GENE_NAME))
         
         # covered variants (excluding blacklisted)
-        cmc_fo_bl <<- findOverlaps(gr_cmc, gr_test_bl, type = "within")
-        cmc_cov_bl <<- distinct(cmc[cmc_fo_bl@from,])
-        table_cmc_covbl <<- as.data.frame(sort(table(cmc_cov_bl$GENE_NAME)))
+        cmc_fo_bl <- findOverlaps(gr_cmc, gr_test_bl, type = "within")@from
+        cmc_cov_bl <- distinct(cmc_gene_id[cmc_fo_bl,])
+        table_cmc_covbl <- as.data.frame(sort(table(cmc_cov_bl$GENE_NAME)))
         
         # total and explicitly blacklisted variants
-        cmc_fo <<- findOverlaps(gr_cmc, gr_test_red, type = "within")
-        cmc_cov <<- distinct(cmc[cmc_fo@from,])
-        table_cmc_covt <<- as.data.frame(table(cmc_cov$GENE_NAME))
-        cmc_bl <<- cmc_cov[!(cmc_cov$GENOMIC_MUTATION_ID %in% cmc_cov_bl$GENOMIC_MUTATION_ID),]
-        table_cmc_bl <<- as.data.frame(table(cmc_bl$GENE_NAME))
+        cmc_fo <- findOverlaps(gr_cmc, gr_test, type = "within")@from
+        cmc_cov <- distinct(cmc_gene_id[cmc_fo,])
+        table_cmc_covt <- as.data.frame(table(cmc_cov$GENE_NAME))
+        cmc_bl <- cmc_cov[!(cmc_cov$GENOMIC_MUTATION_ID %in% cmc_cov_bl$GENOMIC_MUTATION_ID),]
+        #table_cmc_bl <- as.data.frame(table(cmc_bl$GENE_NAME))
         if(!is.null(panelInput$mask)) {
-          table_cmc_bl <<- as.data.frame(table(cmc_bl$GENE_NAME))
+          table_cmc_bl <- as.data.frame(table(cmc_bl$GENE_NAME))
         } else {
-          table_cmc_bl <<- data.frame("Var1" = gl_exp$refseq, "Freq" = 0)
+          table_cmc_bl <- data.frame("Var1" = gl_exp$refseq, "Freq" = 0)
         }
         
         # NON covered variants (excluding blacklisted)
-        cmc_ncov <<- cmc_test[!(cmc_test$GENOMIC_MUTATION_ID %in% cmc_cov$GENOMIC_MUTATION_ID),]
+        cmc_ncov <- cmc_gene_id[!(cmc_gene_id$GENOMIC_MUTATION_ID %in% cmc_cov$GENOMIC_MUTATION_ID),]
         if (nrow(cmc_ncov) > 0) {
-          table_cmc_ncov <<- as.data.frame(table(cmc_ncov$GENE_NAME))
+          table_cmc_ncov <- as.data.frame(table(cmc_ncov$GENE_NAME))
         } else {
-          table_cmc_ncov <<- data.frame("Var1" = gl_exp$refseq, "Freq" = 0)
+          table_cmc_ncov <- data.frame("Var1" = gl_exp$refseq, "Freq" = 0)
         }
         
         # NON covered including blacklisted
-        cmc_ncovbl <<- cmc_test[!(cmc_test$GENOMIC_MUTATION_ID %in% cmc_cov_bl$GENOMIC_MUTATION_ID),]
-        #table_cmc_ncovbl <<- as.data.frame(table(cmc_ncovbl$GENE_NAME))
+        cmc_ncovbl <- cmc_gene_id[!(cmc_gene_id$GENOMIC_MUTATION_ID %in% cmc_cov_bl$GENOMIC_MUTATION_ID),]
         
         # rate of non-covered mutations - only in panel target genes
-        cmc_ncov_posTestRate <<- sum(cmc_ncov$COSMIC_SAMPLE_POSRATE)
-        cmc_ncovbl_posTestRate <<- sum(cmc_ncovbl$COSMIC_SAMPLE_POSRATE)
+        cmc_ncov_posTestRate <- sum(cmc_ncov$COSMIC_SAMPLE_POSRATE)
+        cmc_ncovbl_posTestRate <- sum(cmc_ncovbl$COSMIC_SAMPLE_POSRATE)
+        
+        cmc_id_posrate <- dbGetQuery(sqldb_cosmic, paste0('select GENOMIC_MUTATION_ID, COSMIC_SAMPLE_POSRATE from cosmic where (MUTATION_SIGNIFICANCE_TIER != "Other")'))
         
         # all non-covered mutations (including non-target genes)
-        cmc_ncov_total <<- cmc[!(cmc$GENOMIC_MUTATION_ID %in% cmc_cov$GENOMIC_MUTATION_ID),]
-        cmc_ncovbl_total <<- cmc[!(cmc$GENOMIC_MUTATION_ID %in% cmc_cov_bl$GENOMIC_MUTATION_ID),]
+        cmc_ncov_total <- cmc_id_posrate[!(cmc_id_posrate$GENOMIC_MUTATION_ID %in% cmc_cov$GENOMIC_MUTATION_ID),]
+        cmc_ncovbl_total <- cmc_id_posrate[!(cmc_id_posrate$GENOMIC_MUTATION_ID %in% cmc_cov_bl$GENOMIC_MUTATION_ID),]
         
         # rate of non-covered mutations in all genes (including non targeted genes)
-        cmc_ncov_posTestRateTotal <<- sum(cmc_ncov_total$COSMIC_SAMPLE_POSRATE)
-        cmc_ncovbl_posTestRateTotal <<- sum(cmc_ncovbl_total$COSMIC_SAMPLE_POSRATE)
+        cmc_ncov_posTestRateTotal <- sum(cmc_ncov_total$COSMIC_SAMPLE_POSRATE)
+        cmc_ncovbl_posTestRateTotal <- sum(cmc_ncovbl_total$COSMIC_SAMPLE_POSRATE)
         
         # join tables
-        table_cmc <<- left_join(
+        table_cmc <- left_join(
           left_join(
             left_join(
               left_join(
@@ -1193,7 +1289,7 @@ server <- function(input, output) {
         # list panel items
         panel <- list(panelName = input$pName, 
                       panelFullName = input$pfName,
-                      panelTable = as_tibble(full_join(full_join(table_refseq, table_cmc, by = "gene"), table_clinvar, by = "gene")),
+                      panelTable = as_tibble(full_join(full_join(table_refseq, table_cmc, by = "gene"), table_clv, by = "gene")),
                       panelBed_ori = panelInput$data,
                       panelBed_input = trget,
                       zeroIndex = input$zeroIndex,
@@ -1209,6 +1305,8 @@ server <- function(input, output) {
                       cmcv = cmc_path,
                       panelCatVersion = PanCatv
         )
+        # comment the next line if hosting for others
+        #saveRDS(panel, paste0("panels/", panel[["panelName"]],"_",format(Sys.time(), "%Y%m%d_%H%M%S"), ".panel"))
         
         currentpanel(panel)
         
@@ -1232,19 +1330,8 @@ server <- function(input, output) {
         }
         all_genes <<- data.frame("gene" = sort(unique(all_genes)))
         
-        # combine paneltables into one table
-        dbx2 <<- cbind(data.frame("panel" = rep(dbx[[1]][["panelName"]], nrow(all_genes))),
-                       left_join(all_genes, dbx[[1]][["panelTable"]]))
-        if (length(dbx) > 1) {
-          for (i in 2:length(dbx)) {
-            dbx2 <<- rbind(dbx2, 
-                           cbind(data.frame("panel" = rep(dbx[[i]][["panelName"]], nrow(all_genes))),
-                                 left_join(all_genes, dbx[[i]][["panelTable"]])))
-          }
-        }
-        
-        dbxn$panelNames <- c(dbxn$panelNames, input$pName)
-        dbxn$geneNames <- all_genes
+        dbxn$panelNames <<- c(dbxn$panelNames, input$pName)
+        dbxn$geneNames <<- all_genes
         reset("pName")
         reset("pfName")
         reset("file1")
@@ -1253,9 +1340,243 @@ server <- function(input, output) {
         reset("blackl")
         panelInput$data <- NULL
         panelInput$mask <- NULL
+        incProgress(0.1, detail = "Cleaning up")
+        #rm(gr_cmc, cmc_gene_id, cmc_id_posrate, cmc_covtp, cmc_covp, cmc_ncovbl_posTestRateTotal, cmc_ncov_posTestRateTotal, cmc_ncovbl_total, cmc_ncovbl_total, cmc_ncov_total, cmc_ncovbl_posTestRate, cmc_ncovbl_posTestRate, cmc_ncov_posTestRate, cmc_ncovbl,
+        #  gr_clv, clv_gene_id, clv_covtp, clv_covp, clv_ncov, clv_bl, clv_cov, clv_fo, clv_cov_bl, clv_fo_bl, clv_gene_id,
+        # panel,
+        #table_cmc, table_cmc_covt, table_cmc_covbl, table_cmc_tot, table_clv, table_clv_covt, table_clv_covbl, table_clv_tot, table_refseq, table_refseq, table_refseq_bl, table_refseq_covbl, table_refseq_cov, table_refseq_cov)
+        gc()
         shinyalert(title = "complete")
       })
     }
+  })
+  
+  
+  # UPDATE ALL --------------------------------------------------------------
+  
+  observeEvent(input$updateb, {
+    
+    prepRefSeq(updateDb = T)
+    loadRefSeq(force = T)
+    prepClinvar(updateDb = updateCheckClv())
+    prepCosmic()
+    
+    withProgress(message = "Updating", {
+      for (j in 1:length(dbx)) {
+        incProgress(1/length(dbx), detail = dbx[[j]][["panelName"]])
+        gc()
+        
+        # PROCESS BED FILE
+        #reorder file columns
+        trget <- dbx[[j]][["panelBed_input"]]
+        
+        # make Granges of panel
+        gr_test <- reduce(GRanges(trget$V1, IRanges(trget$V2, trget$V3)))
+        
+        # blacklist
+        blacklist <- dbx[[j]][["blacklist"]]
+        
+        if (length(dbx[[j]][["blacklist"]]) == 1) {
+          gr_blacklist <- GRanges()
+        }
+        if (length(dbx[[j]][["blacklist"]]) >= 3) {
+          gr_blacklist <- GRanges(blacklist$V1, IRanges(blacklist$V2, blacklist$V3))
+        }
+        gr_test_bl <- reduce(unlist(subtract(gr_test, gr_blacklist)))
+        
+        #find overlapping exons in txdb
+        gl_exp <- data.frame("refseq" = unique(names(unlist(ex_by_ge)[findOverlaps(gr_test, unlist(ex_by_ge))@to ])))
+        
+        # identify unique exons and their coverage
+        exons <- ex_by_ge[names(ex_by_ge) %in% gl_exp$refseq]
+        ex_fo <- findOverlaps(gr_test, exons)
+        ex_fo_bl <- findOverlaps(gr_test_bl, exons)
+        ex_by_ge_all_df <- subset(
+          left_join(as.data.table(exons), left_join(
+            as.data.table(pintersect(gr_test[queryHits(ex_fo)], exons[subjectHits(ex_fo)])) %>% 
+              filter(hit == T) %>%
+              group_by(exon_id) %>%
+              summarise(covt_width = sum(width)),
+            as.data.table(pintersect(gr_test_bl[queryHits(ex_fo_bl)], exons[subjectHits(ex_fo_bl)])) %>% 
+              filter(hit == T) %>%
+              group_by(exon_id) %>%
+              summarise(cov_width = sum(width))),
+                    by = "exon_id"),
+          select = c(group_name, seqnames, start, end, strand, width, covt_width, cov_width)) %>%
+          distinct() %>%
+          replace(is.na(.), 0)
+        
+        # reduce exon ranges
+        exons_red <- reduce(ex_by_ge[names(ex_by_ge) %in% gl_exp$refseq])
+        
+        ex_fo1 <- findOverlaps(gr_test, exons_red)
+        ex_fo_pint1 <- pintersect(gr_test[queryHits(ex_fo1)], exons_red[subjectHits(ex_fo1)])
+        table_refseq_cov <- as.data.table(ex_fo_pint1) %>% group_by(group_name) %>% summarise(pcb_covt = sum(width))
+        
+        ex_fo2 <- findOverlaps(gr_test_bl, exons_red)
+        ex_fo_pint2 <- pintersect(gr_test_bl[queryHits(ex_fo2)], exons_red[subjectHits(ex_fo2)])
+        table_refseq_covbl <- as.data.table(ex_fo_pint2) %>% group_by(group_name) %>% summarise(pcb_cov = sum(width))
+        
+        ex_fo3 <- findOverlaps(gr_blacklist, exons_red)
+        ex_fo_pint3 <- pintersect(gr_blacklist[queryHits(ex_fo3)], exons_red[subjectHits(ex_fo3)])
+        table_refseq_bl <- as.data.table(ex_fo_pint3) %>% group_by(group_name) %>% summarise(pcb_bl = sum(width))
+        
+        table_refseq <- left_join(
+          left_join(table_refseq_cov, table_refseq_bl),
+          table_refseq_covbl) %>% mutate(pcb_tot = sum(width(exons_red)), pcb_ncov = pcb_tot - pcb_covt, pcb_covp = pcb_cov / pcb_tot, pcb_covtp = pcb_covt / pcb_tot)
+        colnames(table_refseq)[1] <- "gene"
+        table_refseq <- table_refseq[,c("gene","pcb_ncov","pcb_covt","pcb_bl","pcb_cov","pcb_tot","pcb_covp","pcb_covtp")]
+        
+        # CLINVAR TABLE
+        
+        # create clinvar ranges and overlap with test ranges
+        sqldb_clinvar <- dbConnect(SQLite(), dbname=clv_path)
+        
+        clvlabs <- unique(dbGetQuery(sqldb_clinvar, paste0('select clnsig from clinvar'))[,1])
+        clvlabs <- clvlabs[str_starts(clvlabs, "Pathogenic") | str_starts(clvlabs, "Likely_pathogenic")]
+        
+        gr_clinvar <- GRanges(dbGetQuery(sqldb_clinvar, paste0('select CHROM from clinvar where (clnsig in (', paste(shQuote(clvlabs, type = "cmd"), collapse = ", "),') and gene in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))[,1],
+                              IRanges(dbGetQuery(sqldb_clinvar, paste0('select POS from clinvar where (clnsig in (', paste(shQuote(clvlabs, type = "cmd"), collapse = ", "),') and gene in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))[,1],
+                                      dbGetQuery(sqldb_clinvar, paste0('select POS from clinvar where (clnsig in (', paste(shQuote(clvlabs, type = "cmd"), collapse = ", "),') and gene in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))[,1]+
+                                        (nchar(dbGetQuery(sqldb_clinvar, paste0('select REF from clinvar where (clnsig in (', paste(shQuote(clvlabs, type = "cmd"), collapse = ", "),') and gene in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))[,1])-1)))
+        
+        # total muts in targeted genes
+        clv_gene_id <- dbGetQuery(sqldb_clinvar, paste0('select gene, ID from clinvar where (clnsig in (', paste(shQuote(clvlabs, type = "cmd"), collapse = ", "),') and gene in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))
+        table_clv_tot <- as.data.frame(table(clv_gene_id$gene))
+        
+        # covered variants (excluding blacklisted)
+        clv_fo_bl <- findOverlaps(gr_clinvar, gr_test_bl, type = "within")@from
+        clv_cov_bl <<- distinct(clv_gene_id[clv_fo_bl,])
+        table_clv_covbl <- as.data.frame(sort(table(clv_cov_bl$gene)))
+        
+        # total and specific blacklisted variants
+        clv_fo <- findOverlaps(gr_clinvar, gr_test, type = "within")@from
+        clv_cov <- distinct(clv_gene_id[clv_fo,])
+        table_clv_covt <- as.data.frame(table(clv_cov$gene))
+        clv_bl <- clv_cov[!(clv_cov$ID %in% clv_cov_bl$ID),]
+        #table_clv_bl <- as.data.frame(table(clv_bl$gene))
+        if(!is.null(panelInput$mask)) {
+          table_clv_bl <- as.data.frame(clv_bl$gene)
+        } else {
+          table_clv_bl <- data.frame("Var1" = gl_exp$refseq, "Freq" = 0)
+        }
+        
+        # NON covered variants (excluding blacklisted)
+        clv_ncov <- clv_gene_id[!(clv_gene_id$ID %in% clv_cov$ID),]
+        if (nrow(clv_ncov) > 0) {
+          table_clv_ncov <- as.data.frame(table(clv_ncov$gene))
+        } else {
+          table_clv_ncov <- data.frame("Var1" = gl_exp$refseq, "Freq" = 0)
+        }
+        
+        # join tables
+        table_clv <- left_join(
+          left_join(
+            left_join(
+              left_join(
+                full_join(data.frame("Var1" = gl_exp$refseq), table_clv_ncov, by = "Var1"),
+                table_clv_covt, by = "Var1"),
+              table_clv_bl, by = "Var1"),
+            table_clv_covbl, by = "Var1"),
+          table_clv_tot, by = "Var1")
+        colnames(table_clv) <- c("gene","clv_ncov","clv_covt","clv_bl","clv_cov","clv_tot")
+        table_clv$clv_covp <- table_clv$clv_cov/table_clv$clv_tot
+        table_clv$clv_covtp <- table_clv$clv_covt/table_clv$clv_tot
+        table_clv[is.na(table_clv)] <- 0
+        
+        # Cosmic ------------------------------------------------------------------
+        # make ranges, find overlap (blacklisted)
+        
+        sqldb_cosmic <- dbConnect(SQLite(), dbname=cmc_path)
+        gr_cmc <-  GRanges(dbGetQuery(sqldb_cosmic, paste0('select chr from cosmic where (MUTATION_SIGNIFICANCE_TIER != "Other" and GENE_NAME in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))[,1],
+                           IRanges(dbGetQuery(sqldb_cosmic, paste0('select start from cosmic where (MUTATION_SIGNIFICANCE_TIER != "Other" and GENE_NAME in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))[,1],
+                                   dbGetQuery(sqldb_cosmic, paste0('select end from cosmic where (MUTATION_SIGNIFICANCE_TIER != "Other" and GENE_NAME in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))[,1]))
+        
+        
+        # total muts in targeted genes
+        cmc_gene_id <- dbGetQuery(sqldb_cosmic, paste0('select GENE_NAME, GENOMIC_MUTATION_ID, COSMIC_SAMPLE_POSRATE from cosmic where (MUTATION_SIGNIFICANCE_TIER != "Other" and GENE_NAME in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))
+        table_cmc_tot <- as.data.frame(table(cmc_gene_id$GENE_NAME))
+        
+        # covered variants (excluding blacklisted)
+        cmc_fo_bl <- findOverlaps(gr_cmc, gr_test_bl, type = "within")@from
+        cmc_cov_bl <- distinct(cmc_gene_id[cmc_fo_bl,])
+        table_cmc_covbl <- as.data.frame(sort(table(cmc_cov_bl$GENE_NAME)))
+        
+        # total and explicitly blacklisted variants
+        cmc_fo <- findOverlaps(gr_cmc, gr_test, type = "within")@from
+        cmc_cov <- distinct(cmc_gene_id[cmc_fo,])
+        table_cmc_covt <- as.data.frame(table(cmc_cov$GENE_NAME))
+        cmc_bl <- cmc_cov[!(cmc_cov$GENOMIC_MUTATION_ID %in% cmc_cov_bl$GENOMIC_MUTATION_ID),]
+        #table_cmc_bl <- as.data.frame(table(cmc_bl$GENE_NAME))
+        if(!is.null(panelInput$mask)) {
+          table_cmc_bl <- as.data.frame(table(cmc_bl$GENE_NAME))
+        } else {
+          table_cmc_bl <- data.frame("Var1" = gl_exp$refseq, "Freq" = 0)
+        }
+        
+        # NON covered variants (excluding blacklisted)
+        cmc_ncov <- cmc_gene_id[!(cmc_gene_id$GENOMIC_MUTATION_ID %in% cmc_cov$GENOMIC_MUTATION_ID),]
+        if (nrow(cmc_ncov) > 0) {
+          table_cmc_ncov <- as.data.frame(table(cmc_ncov$GENE_NAME))
+        } else {
+          table_cmc_ncov <- data.frame("Var1" = gl_exp$refseq, "Freq" = 0)
+        }
+        
+        # NON covered including blacklisted
+        cmc_ncovbl <- cmc_gene_id[!(cmc_gene_id$GENOMIC_MUTATION_ID %in% cmc_cov_bl$GENOMIC_MUTATION_ID),]
+        
+        # rate of non-covered mutations - only in panel target genes
+        cmc_ncov_posTestRate <- sum(cmc_ncov$COSMIC_SAMPLE_POSRATE)
+        cmc_ncovbl_posTestRate <- sum(cmc_ncovbl$COSMIC_SAMPLE_POSRATE)
+        
+        cmc_id_posrate <- dbGetQuery(sqldb_cosmic, paste0('select GENOMIC_MUTATION_ID, COSMIC_SAMPLE_POSRATE from cosmic where (MUTATION_SIGNIFICANCE_TIER != "Other")'))
+        
+        # all non-covered mutations (including non-target genes)
+        cmc_ncov_total <- cmc_id_posrate[!(cmc_id_posrate$GENOMIC_MUTATION_ID %in% cmc_cov$GENOMIC_MUTATION_ID),]
+        cmc_ncovbl_total <- cmc_id_posrate[!(cmc_id_posrate$GENOMIC_MUTATION_ID %in% cmc_cov_bl$GENOMIC_MUTATION_ID),]
+        
+        # rate of non-covered mutations in all genes (including non targeted genes)
+        cmc_ncov_posTestRateTotal <- sum(cmc_ncov_total$COSMIC_SAMPLE_POSRATE)
+        cmc_ncovbl_posTestRateTotal <- sum(cmc_ncovbl_total$COSMIC_SAMPLE_POSRATE)
+        
+        # join tables
+        table_cmc <- left_join(
+          left_join(
+            left_join(
+              left_join(
+                full_join(data.frame("Var1" = gl_exp$refseq), table_cmc_ncov, by = "Var1"),
+                table_cmc_covt, by = "Var1"),
+              table_cmc_bl, by = "Var1"),
+            table_cmc_covbl, by = "Var1"),
+          table_cmc_tot, by = "Var1")
+        colnames(table_cmc) <- c("gene","cmc_ncov","cmc_covt","cmc_bl","cmc_cov","cmc_tot")
+        table_cmc$cmc_covp <- table_cmc$cmc_cov/table_cmc$cmc_tot
+        table_cmc$cmc_covtp <- table_cmc$cmc_covt/table_cmc$cmc_tot
+        table_cmc[is.na(table_cmc)] <- 0
+        
+        # list panel items
+        panel <- list(panelName = dbx[[j]][["panelName"]], 
+                      panelFullName = dbx[[j]][["panelFullName"]],
+                      panelTable = as_tibble(full_join(full_join(table_refseq, table_cmc, by = "gene"), table_clv, by = "gene")),
+                      panelBed_ori = dbx[[j]][["panelBed_ori"]],
+                      panelBed_input = trget,
+                      zeroIndex = dbx[[j]][["zeroIndex"]],
+                      blacklist = blacklist,
+                      cmcNcovPosRate = cmc_ncov_posTestRate,
+                      cmcNcovPosRate_bl = cmc_ncovbl_posTestRate, 
+                      cmcNcovPosRateTotal = cmc_ncov_posTestRateTotal,
+                      cmcNcovPosRateTotal_bl = cmc_ncovbl_posTestRateTotal,
+                      sysTimeCreated = Sys.time(),
+                      exon_coverage = ex_by_ge_all_df,
+                      txdbv = txdb_path,
+                      clvv = clv_path,
+                      cmcv = cmc_path,
+                      panelCatVersion = PanCatv
+        )
+        saveRDS(panel, paste0("panels/", panel[["panelName"]],"_",format(Sys.time(), "%Y%m%d_%H%M%S"), ".panel"))
+      }
+    })
+    shinyalert(title = "complete! Please restart application.")
   })
 }
 
