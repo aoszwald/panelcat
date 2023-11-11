@@ -34,7 +34,8 @@ if(!require(randomcoloR)){
   library(randomcoloR)}
 if (!require("BiocManager", quietly = TRUE)){
   install.packages("BiocManager")
-  BiocManager::install(version = "3.17")} 
+  #BiocManager::install(version = "3.17")
+  } 
 if(!require(GenomicFeatures)){
   BiocManager::install("GenomicFeatures")
   library(GenomicFeatures)}
@@ -449,12 +450,17 @@ server <- function(input, output) {
   
   # check if DBs loaded
   if (status_dbload_success != T) {
-    shinyalert(title = "Error loading panels. Reason: Not all panels analyzed with same Version of PanelCat. Please restore latest functional state, update all, and then add new panels.")
+    shinyalert(title = "Error loading panels", test = "Reason: Not all panels analyzed with same Version of PanelCat. Please restore latest functional state, update all, and then add new panels.")
   }
   
   if (status_dbload_conflict == T) {
-    shinyalert(title = "Warning! Not all loaded panels were analyzed with identical database versions. Suggest to remove and re-analyze affected panels, or update all.")
+    shinyalert(title = "Warning!", text = "Not all loaded panels were analyzed with identical database versions. Suggest to remove and re-analyze affected panels, or update all.")
   }
+  
+  if (length(cmc_path) == 0 & length(list.files(path = "db_ori", pattern="^cmc_export\\.tsv$")) == 0) {
+    shinyalert(title = "Warning!", text  = "Please download COSMIC CMC database ('cmc_export.tsv' from https://cancer.sanger.ac.uk/cosmic) into the panelcat subdirectory 'db_ori'. You will need to create a COSMIC account. Proceeding without this file will lead to unexpected app behaviour.")
+  }
+  
   
   output$infotext <- renderText(paste(infotext, collapse = "\n"))
   

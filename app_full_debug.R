@@ -1103,19 +1103,19 @@ server <- function(input, output) {
         # make Granges of panel
         trget$V2 <- as.numeric(trget$V2)
         trget$V3 <- as.numeric(trget$V3)
-        gr_test <- reduce(GRanges(trget$V1, IRanges(trget$V2, trget$V3)))
+        gr_test <<- reduce(GRanges(trget$V1, IRanges(trget$V2, trget$V3)))
         
         # make blacklist ranges
         if (!is.null(panelInput$mask)) {
           blacklist$V2 <- as.numeric(blacklist$V2)
           blacklist$V3 <- as.numeric(blacklist$V3)
           names(blacklist) <- c("V1", "V2","V3")
-          gr_blacklist <- GRanges(blacklist$V1, IRanges(blacklist$V2, blacklist$V3))
+          gr_blacklist <<- GRanges(blacklist$V1, IRanges(blacklist$V2, blacklist$V3))
         }
         
-        gr_test_bl <- reduce(unlist(subtract(gr_test, gr_blacklist)))
+        gr_test_bl <<- reduce(unlist(subtract(gr_test, gr_blacklist)))
         
-        incProgress(0.1, detail = "Find targeted exons")
+        incProgress(0.1, detail = "Find targeted esxons")
         
         ### RefSeq
         # find target genes
