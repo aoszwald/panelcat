@@ -445,7 +445,7 @@ server <- function(input, output) {
   options(shiny.maxRequestSize=500*1024^2)
   
   observe({
-    shinyalert("DISCLAIMER and user agreement:", text = "This software is intended for reasearch use only, and not intended to make medical decisions. By proceeding, the user agrees to take sole responsibility, and not to hold the authors/providers of this software responsible, for any decisions based on information obtained through this application.")
+    shinyalert("DISCLAIMER and user agreement:", text = "This software is intended for reasearch use only, and not intended to make medical decisions. By proceeding, the user agrees to take sole responsibility, and not to hold the authors/providers of this software responsible, for any decisions based on information obtained through this application.", confirmButtonText = "I understand and agree.", closeOnEsc = F)
   })
   
   # check if DBs loaded
@@ -1008,7 +1008,7 @@ server <- function(input, output) {
   colVec <- reactive({
     colVecs <- as.vector(as.numeric(str_split_fixed(input$pCols,",",3)))
     if (sum(is.na(colVecs)) > 0) {
-      colVecs <- seq(1,ncol(panelInput$data))
+      colVecs <- seq(1,3)
     }
     if (sum(is.na(colVecs)) == 0) {
       colVecs <- colVecs
@@ -1063,6 +1063,8 @@ server <- function(input, output) {
     #reorder file columns
     trget <- panelInput$data[rowVec(),colVec()]
     names(trget) <- c("V1", "V2","V3")
+    trget$V2 <- as.numeric(trget$V2)
+    trget$V3 <- as.numeric(trget$V3)
     
     # apply zero-based index correction if dealing with .bed convention
     if (input$zeroIndex == T) {
@@ -1089,9 +1091,9 @@ server <- function(input, output) {
     } else if (is.null(input$pName)) {
       shinyalert(title = "Please provide a new unique panel name.")
     } else if ((sum(anyNA(as.numeric(trget$V2)), anyNA(as.numeric(trget$V3))) != 0)) {
-      shinyalert(title = "Specified panel file columns contain non-numeric entries. Please review.")
+      shinyalert(title = "Specified panel file columns or rows contain non-numeric entries. Please review.")
     } else if (blacklist_check == F) {
-      shinyalert(title = "Specified mask file columns contain non-numeric entries. Please review.")
+      shinyalert(title = "Specified mask file columns or rows contain non-numeric entries. Please review.")
     } else {
       
       withProgress(message = "Processing", {
@@ -1100,12 +1102,9 @@ server <- function(input, output) {
         prepClinvar(updateDb = F)
         prepCosmic()
         
-        # make Granges of panel
-        trget$V2 <- as.numeric(trget$V2)
-        trget$V3 <- as.numeric(trget$V3)
+        # make Granges of panel and mask
         gr_test <- reduce(GRanges(trget$V1, IRanges(trget$V2, trget$V3)))
         
-        # make blacklist ranges
         if (!is.null(panelInput$mask)) {
           blacklist$V2 <- as.numeric(blacklist$V2)
           blacklist$V3 <- as.numeric(blacklist$V3)
