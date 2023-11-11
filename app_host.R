@@ -12,7 +12,6 @@
   library(randomcoloR)
   library(GenomicFeatures)
   library(RSQLite)
-
 # Functions ---------------------------------------------------------------
 {
   # set true to always skip database update
@@ -40,9 +39,7 @@
     str_split_fixed(x, ":",2)[,1]
   }
   
-  # RefSeq loader
   loadRefSeq <- function(force) {
-    prepRefSeq(updateDb = F)
     if (exists("ex_by_ge") == F | force == T) {
       withProgress(message = "Loading RefSeq database", {
         ex_by_ge <<- readRDS(txdb_path)
@@ -52,12 +49,31 @@
   
   loadExDb <- function() {
     if (length(exdb_path) == 0) 
-      prepRefSeq(updateDb = F)
     if (exists("ex_by_ge_df1") == F) {
       ex_by_ge_df1 <<- readRDS(exdb_path)
     }
   }
   
+  # CLINVAR update check (only used via "update all")
+  updateCheckClv <- function() {
+    url <- "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh37/weekly/clinvar.vcf.gz.md5"
+    tmp <- tempfile()
+    download.file(url, tmp)
+    clvMd5Serv <- readLines(tmp)
+    
+    if (length(clv_md5_path) == 0 ){
+      return(TRUE)
+    } else {
+      clvMd5Cli <- readRDS(clv_md5_path)
+      if (identical(clvMd5Serv, clvMd5Cli) == T) {
+        return(FALSE)
+      } else {
+        return(TRUE)
+      }
+    }
+  }
+  
+  # Clinvar loader / creator
   loadClinVar <- function(updateDb) {
       if (exists("gr_clinvar") == F) {
         withProgress(message = "Loading ClinVar database", {
@@ -71,6 +87,7 @@
     }
   }
   
+  # COSMIC loader
   loadCosmic <- function() {
     withProgress(message = "Loading COSMIC database", {
       # check if ranges are loaded, if not, load
@@ -217,16 +234,16 @@ ui <- ui <- fluidPage(
       textInput("pName","3: Panel Name (abbreviation)"),
       textInput("pfName","4: Panel Name (full)"),
       textInput("pRows","5: start row, end row"),
-      textInput("pCols","6: Column order: Chr, Start, Stop, Name"),
+      textInput("pCols","6: Column order: Chr, Start, Stop"),
       fileInput("blackl","7: Panel mask file"),
       textInput("pmRows","8: Mask start row, end row"),
-      textInput("pmCols","9: Mask column order: Chr, Start, Stop, Name"),
+      textInput("pmCols","9: Mask column order: Chr, Start, Stop"),
       actionButton("startb", "10: Start!"),
       downloadButton("save_state", "11: Save to file"),
       fileInput("panelUp","12: processed panel file", accept = ".panel"),
       actionButton("panelUpButton","12: upload")
       # comment the next line if hosting for others
-      #,actionButton("updateb", "13: UPDATE ALL")
+      ,actionButton("updateb", "13: UPDATE ALL")
     ),
     width = 3
   ),
@@ -280,23 +297,32 @@ server <- function(input, output) {
   options(shiny.maxRequestSize=500*1024^2)
   
   observe({
-    shinyalert("DISCLAIMER and user agreement:", text = "This software is intended for reasearch use only, and not intended to make medical decisions. By proceeding, the user agrees to take sole responsibility, and not to hold the authors/providers of this software responsible, for any decisions based on information obtained through this application.")
+    shinyalert("DISCLAIMER and user agreement:", text = "This software is intended for reasearch use only, and not intended to make medical decisions. By proceeding, the user agrees to take sole responsibility, and not to hold the authors/providers of this software responsible, for any decisions based on information obtained through this application.", confirmButtonText = "I understand and agree.", closeOnEsc = F)
   })
   
   # check if DBs loaded
   if (status_dbload_success != T) {
-    shinyalert(title = "Error loading panels. Reason: Not all panels analyzed with same Version of PanelCat. Please restore latest functional state, update all, and then add new panels.")
+    shinyalert(title = "Error loading panels", test = "Reason: Not all panels analyzed with same Version of PanelCat. Please restore latest functional state, update all, and then add new panels.")
   }
   
   if (status_dbload_conflict == T) {
-    shinyalert(title = "Warning! Not all loaded panels were analyzed with identical database versions. Suggest to remove and re-analyze affected panels, or update all.")
+    shinyalert(title = "Warning!", text = "Not all loaded panels were analyzed with identical database versions. Suggest to remove and re-analyze affected panels, or update all.")
   }
+  
+  if (length(cmc_path) == 0 & length(list.files(path = "db_ori", pattern="^cmc_export\\.tsv$")) == 0) {
+    shinyalert(title = "Warning!", text  = "Please download COSMIC CMC database ('cmc_export.tsv' from https://cancer.sanger.ac.uk/cosmic) into the panelcat subdirectory 'db_ori'. You will need to create a COSMIC account. Proceeding without this file will lead to unexpected app behaviour.")
+  }
+  
   
   output$infotext <- renderText(paste(infotext, collapse = "\n"))
   
   # define reactive input choices
   dbxn <- reactiveValues(panelNames = names(dbx), geneNames = all_genes)
   
+  # transition to reactive table later sometime
+  #dbxt <- reactiveValues(paneldata = dbx)
+  
+  # define reactive inputs
   output$xpanelsel <- renderUI({
     selectInput('xpanel', 'Panel X', dbxn$panelNames, selected = dbxn$panelNames[1])
   })
@@ -834,7 +860,7 @@ server <- function(input, output) {
   colVec <- reactive({
     colVecs <- as.vector(as.numeric(str_split_fixed(input$pCols,",",3)))
     if (sum(is.na(colVecs)) > 0) {
-      colVecs <- seq(1,ncol(panelInput$data))
+      colVecs <- seq(1,3)
     }
     if (sum(is.na(colVecs)) == 0) {
       colVecs <- colVecs
@@ -889,6 +915,8 @@ server <- function(input, output) {
     #reorder file columns
     trget <- panelInput$data[rowVec(),colVec()]
     names(trget) <- c("V1", "V2","V3")
+    trget$V2 <- as.numeric(trget$V2)
+    trget$V3 <- as.numeric(trget$V3)
     
     # apply zero-based index correction if dealing with .bed convention
     if (input$zeroIndex == T) {
@@ -915,21 +943,18 @@ server <- function(input, output) {
     } else if (is.null(input$pName)) {
       shinyalert(title = "Please provide a new unique panel name.")
     } else if ((sum(anyNA(as.numeric(trget$V2)), anyNA(as.numeric(trget$V3))) != 0)) {
-      shinyalert(title = "Specified panel file columns contain non-numeric entries. Please review.")
+      shinyalert(title = "Specified panel file columns or rows contain non-numeric entries. Please review.")
     } else if (blacklist_check == F) {
-      shinyalert(title = "Specified mask file columns contain non-numeric entries. Please review.")
+      shinyalert(title = "Specified mask file columns or rows contain non-numeric entries. Please review.")
     } else {
       
       withProgress(message = "Processing", {
         # load databases
         loadRefSeq(force = F)
 
-        # make Granges of panel
-        trget$V2 <- as.numeric(trget$V2)
-        trget$V3 <- as.numeric(trget$V3)
+        # make Granges of panel and mask
         gr_test <- reduce(GRanges(trget$V1, IRanges(trget$V2, trget$V3)))
         
-        # make blacklist ranges
         if (!is.null(panelInput$mask)) {
           blacklist$V2 <- as.numeric(blacklist$V2)
           blacklist$V3 <- as.numeric(blacklist$V3)
@@ -1135,6 +1160,8 @@ server <- function(input, output) {
                       cmcv = cmc_path,
                       panelCatVersion = PanCatv
         )
+        # comment the next line if hosting for others
+        saveRDS(panel, paste0("panels/", panel[["panelName"]],"_",format(Sys.time(), "%Y%m%d_%H%M%S"), ".panel"))
         
         currentpanel(panel)
         
@@ -1146,6 +1173,10 @@ server <- function(input, output) {
         dbx <<- dbx[dbx_table$current]
         
         names(dbx) <<- nameList(dbx, "panelName")
+        
+        # how to check if panels with same name are completely different
+        # compare rows of original target file
+        # TBD
         
         # get genes of all panels
         all_genes <<- vector()
@@ -1165,15 +1196,15 @@ server <- function(input, output) {
         panelInput$data <- NULL
         panelInput$mask <- NULL
         incProgress(0.1, detail = "Cleaning up")
+        #rm(gr_cmc, cmc_gene_id, cmc_id_posrate, cmc_covtp, cmc_covp, cmc_ncovbl_posTestRateTotal, cmc_ncov_posTestRateTotal, cmc_ncovbl_total, cmc_ncovbl_total, cmc_ncov_total, cmc_ncovbl_posTestRate, cmc_ncovbl_posTestRate, cmc_ncov_posTestRate, cmc_ncovbl,
+        #  gr_clv, clv_gene_id, clv_covtp, clv_covp, clv_ncov, clv_bl, clv_cov, clv_fo, clv_cov_bl, clv_fo_bl, clv_gene_id,
+        # panel,
+        #table_cmc, table_cmc_covt, table_cmc_covbl, table_cmc_tot, table_clv, table_clv_covt, table_clv_covbl, table_clv_tot, table_refseq, table_refseq, table_refseq_bl, table_refseq_covbl, table_refseq_cov, table_refseq_cov)
         gc()
         shinyalert(title = "complete")
       })
     }
   })
-  
-  
-  # UPDATE ALL --------------------------------------------------------------
-  
 }
 
 # Run the application 
