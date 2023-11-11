@@ -79,7 +79,7 @@ options(timeout = 360)
       # if database path does not exist, create new
       if ((length(txdb_path) == 0 | updateDb == T) & debugMode == F) {
         incProgress(0.3, detail = "Downoading")
-        txdb <<- makeTxDbFromGFF("https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh37_latest/refseq_identifiers/GRCh37_latest_genomic.gff.gz",
+        txdb <- makeTxDbFromGFF("https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh37_latest/refseq_identifiers/GRCh37_latest_genomic.gff.gz",
                                  dataSource = "https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh37_latest/refseq_identifiers/GRCh37_latest_genomic.gff.gz")
         incProgress(0.3, detail = "Processing")
         assRep <- read.table("https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/annotation_releases/105.20220307/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_assembly_report.txt", fill = T)
@@ -905,7 +905,7 @@ server <- function(input, output) {
   table_muts <- reactive({
     loadCosmic()
     sqldb_cosmic <- dbConnect(SQLite(), dbname=cmc_path)
-    gr_test <<- GRanges(dbx[[input$mutpanel]][["panelBed_input"]][["V1"]],
+    gr_test <- GRanges(dbx[[input$mutpanel]][["panelBed_input"]][["V1"]],
                        IRanges(
                          dbx[[input$mutpanel]][["panelBed_input"]][["V2"]],
                          dbx[[input$mutpanel]][["panelBed_input"]][["V3"]]))
@@ -914,11 +914,11 @@ server <- function(input, output) {
       dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
       mutate(GENOMIC_MUTATION_ID = sprintf('<a href="https://cancer.sanger.ac.uk/cosmic/search?q=%s" target="_blank"> %s </a>',GENOMIC_MUTATION_ID,GENOMIC_MUTATION_ID))
     } else {
-      gr_bl <<- GRanges(dbx[[input$mutpanel]][["blacklist"]][["V1"]],
+      gr_bl <- GRanges(dbx[[input$mutpanel]][["blacklist"]][["V1"]],
                        IRanges(
                          dbx[[input$mutpanel]][["blacklist"]][["V2"]],
                          dbx[[input$mutpanel]][["blacklist"]][["V3"]]))
-      gr_test_bl <<- unlist(GenomicRanges::subtract(gr_test, gr_bl))
+      gr_test_bl <- unlist(GenomicRanges::subtract(gr_test, gr_bl))
       muts_overlaps <- findOverlaps(gr_cmc, gr_test_bl, type = "within")@from
       dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
       mutate(GENOMIC_MUTATION_ID = sprintf('<a href="https://cancer.sanger.ac.uk/cosmic/search?q=%s" target="_blank"> %s </a>',GENOMIC_MUTATION_ID,GENOMIC_MUTATION_ID))
@@ -936,7 +936,7 @@ server <- function(input, output) {
   
   table_clvmuts <- reactive({
     loadClinVar(updateDb = FALSE)
-    sqldb_clinvar <<- dbConnect(SQLite(), dbname=clv_path)
+    sqldb_clinvar <- dbConnect(SQLite(), dbname=clv_path)
     gr_test <- GRanges(dbx[[input$clvpanel]][["panelBed_input"]][["V1"]],
                        IRanges(
                          dbx[[input$clvpanel]][["panelBed_input"]][["V2"]],
@@ -1157,7 +1157,7 @@ server <- function(input, output) {
         ex_fo_pint3 <- pintersect(gr_blacklist[queryHits(ex_fo3)], exons_red[subjectHits(ex_fo3)])
         table_refseq_bl <- as.data.table(ex_fo_pint3) %>% group_by(group_name) %>% summarise(pcb_bl = sum(width))
         
-        table_refseq <<- left_join(
+        table_refseq <- left_join(
           left_join(table_refseq_cov, table_refseq_bl),
           table_refseq_covbl) %>% mutate(pcb_tot = sum(width(exons_red)), pcb_ncov = pcb_tot - pcb_covt, pcb_covp = pcb_cov / pcb_tot, pcb_covtp = pcb_covt / pcb_tot)
         colnames(table_refseq)[1] <- "gene"
@@ -1183,7 +1183,7 @@ server <- function(input, output) {
         
         # covered variants (excluding blacklisted)
         clv_fo_bl <- findOverlaps(gr_clinvar, gr_test_bl, type = "within")@from
-        clv_cov_bl <<- distinct(clv_gene_id[clv_fo_bl,])
+        clv_cov_bl <- distinct(clv_gene_id[clv_fo_bl,])
         table_clv_covbl <- as.data.frame(sort(table(clv_cov_bl$gene)))
         
         # total and specific blacklisted variants
@@ -1448,7 +1448,7 @@ server <- function(input, output) {
         
         # covered variants (excluding blacklisted)
         clv_fo_bl <- findOverlaps(gr_clinvar, gr_test_bl, type = "within")@from
-        clv_cov_bl <<- distinct(clv_gene_id[clv_fo_bl,])
+        clv_cov_bl <- distinct(clv_gene_id[clv_fo_bl,])
         table_clv_covbl <- as.data.frame(sort(table(clv_cov_bl$gene)))
         
         # total and specific blacklisted variants
