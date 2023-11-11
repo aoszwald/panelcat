@@ -12,6 +12,7 @@
   library(randomcoloR)
   library(GenomicFeatures)
   library(RSQLite)
+
 # Functions ---------------------------------------------------------------
 {
   # set true to always skip database update
@@ -39,7 +40,9 @@
     str_split_fixed(x, ":",2)[,1]
   }
   
+  # RefSeq loader
   loadRefSeq <- function(force) {
+    prepRefSeq(updateDb = F)
     if (exists("ex_by_ge") == F | force == T) {
       withProgress(message = "Loading RefSeq database", {
         ex_by_ge <<- readRDS(txdb_path)
@@ -49,34 +52,16 @@
   
   loadExDb <- function() {
     if (length(exdb_path) == 0) 
+      prepRefSeq(updateDb = F)
     if (exists("ex_by_ge_df1") == F) {
       ex_by_ge_df1 <<- readRDS(exdb_path)
     }
   }
   
-  # CLINVAR update check (only used via "update all")
-  updateCheckClv <- function() {
-    url <- "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh37/weekly/clinvar.vcf.gz.md5"
-    tmp <- tempfile()
-    download.file(url, tmp)
-    clvMd5Serv <- readLines(tmp)
-    
-    if (length(clv_md5_path) == 0 ){
-      return(TRUE)
-    } else {
-      clvMd5Cli <- readRDS(clv_md5_path)
-      if (identical(clvMd5Serv, clvMd5Cli) == T) {
-        return(FALSE)
-      } else {
-        return(TRUE)
-      }
-    }
-  }
-  
-  # Clinvar loader / creator
   loadClinVar <- function(updateDb) {
       if (exists("gr_clinvar") == F) {
         withProgress(message = "Loading ClinVar database", {
+          prepClinvar(updateDb = F)
         incProgress(0.5, detail = "Loading")
         sqldb_clinvar <- dbConnect(SQLite(), dbname=clv_path)
         gr_clinvar <<- GRanges(dbGetQuery(sqldb_clinvar, paste0('select CHROM from clinvar'))[,1],
@@ -90,6 +75,7 @@
   # COSMIC loader
   loadCosmic <- function() {
     withProgress(message = "Loading COSMIC database", {
+      prepCosmic()
       # check if ranges are loaded, if not, load
       incProgress(0.1, detail = "Loading")
       if (exists("gr_cmc") == F) {
@@ -243,7 +229,7 @@ ui <- ui <- fluidPage(
       fileInput("panelUp","12: processed panel file", accept = ".panel"),
       actionButton("panelUpButton","12: upload")
       # comment the next line if hosting for others
-      ,actionButton("updateb", "13: UPDATE ALL")
+      #,actionButton("updateb", "13: UPDATE ALL")
     ),
     width = 3
   ),
@@ -763,21 +749,23 @@ server <- function(input, output) {
                          dbx[[input$mutpanel]][["panelBed_input"]][["V2"]],
                          dbx[[input$mutpanel]][["panelBed_input"]][["V3"]]))
     if (input$hideCmcBl == T | length(dbx[[input$mutpanel]][["blacklist"]]) == 1) {
-      muts_overlaps <- findOverlaps(gr_test, gr_cmc, type = "within")@to
-      dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')'))
+      muts_overlaps <- findOverlaps(gr_cmc, gr_test, type = "within")@from
+      dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
+      mutate(GENOMIC_MUTATION_ID = sprintf('<a href="https://cancer.sanger.ac.uk/cosmic/search?q=%s" target="_blank"> %s </a>',GENOMIC_MUTATION_ID,GENOMIC_MUTATION_ID))
     } else {
       gr_bl <- GRanges(dbx[[input$mutpanel]][["blacklist"]][["V1"]],
                        IRanges(
                          dbx[[input$mutpanel]][["blacklist"]][["V2"]],
                          dbx[[input$mutpanel]][["blacklist"]][["V3"]]))
       gr_test_bl <- unlist(GenomicRanges::subtract(gr_test, gr_bl))
-      muts_overlaps <- findOverlaps(gr_test_bl, gr_cmc, type = "within")@to
-      dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')'))
+      muts_overlaps <- findOverlaps(gr_cmc, gr_test_bl, type = "within")@from
+      dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
+      mutate(GENOMIC_MUTATION_ID = sprintf('<a href="https://cancer.sanger.ac.uk/cosmic/search?q=%s" target="_blank"> %s </a>',GENOMIC_MUTATION_ID,GENOMIC_MUTATION_ID))
     }
   })
   
   output$cmcmuts <- DT::renderDataTable({
-    DT::datatable(table_muts(), 
+    DT::datatable(table_muts(), escape = F,
                   filter = list(position = "top", clear = F),
                   options = list(search = list(regex = TRUE, caseInsensitive = T)))
   })
@@ -787,29 +775,29 @@ server <- function(input, output) {
   
   table_clvmuts <- reactive({
     loadClinVar(updateDb = FALSE)
-    sqldb_clinvar <<- dbConnect(SQLite(), dbname=clv_path)
+    sqldb_clinvar <- dbConnect(SQLite(), dbname=clv_path)
     gr_test <- GRanges(dbx[[input$clvpanel]][["panelBed_input"]][["V1"]],
                        IRanges(
                          dbx[[input$clvpanel]][["panelBed_input"]][["V2"]],
                          dbx[[input$clvpanel]][["panelBed_input"]][["V3"]]))
     if (input$hideClvBl == T | length(dbx[[input$clvpanel]][["blacklist"]]) == 1) {
-      muts_overlaps <- findOverlaps(gr_test, gr_clinvar, type = "within")@to
+      muts_overlaps <- findOverlaps(gr_clinvar, gr_test, type = "within")@from
       dbGetQuery(sqldb_clinvar, paste0('SELECT * FROM clinvar WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
-        mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat))
+        mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat), ID = sprintf('<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=%s" target="_blank"> %s </a>',ID,ID))
     } else {
       gr_bl <- GRanges(dbx[[input$clvpanel]][["blacklist"]][["V1"]],
                        IRanges(
                          dbx[[input$clvpanel]][["blacklist"]][["V2"]],
                          dbx[[input$clvpanel]][["blacklist"]][["V3"]]))
       gr_test_bl <- unlist(GenomicRanges::subtract(gr_test, gr_bl))
-      muts_overlaps <- findOverlaps(gr_test_bl, gr_clinvar, type = "within")
+      muts_overlaps <- findOverlaps(gr_clinvar, gr_test_bl, type = "within")@from
       dbGetQuery(sqldb_clinvar, paste0('SELECT * FROM clinvar WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
-        mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat))
+        mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat), ID = sprintf('<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=%s" target="_blank"> %s </a>',ID,ID))
     }
   })
   
   output$clvmuts <- DT::renderDataTable({
-    DT::datatable(table_clvmuts(),
+    DT::datatable(table_clvmuts(), escape = F,
                   filter = list(position = "top", clear = F),
                   options = list(search = list(regex = TRUE, caseInsensitive = T)))
   })
@@ -951,7 +939,9 @@ server <- function(input, output) {
       withProgress(message = "Processing", {
         # load databases
         loadRefSeq(force = F)
-
+        prepClinvar(updateDb = F)
+        prepCosmic()
+        
         # make Granges of panel and mask
         gr_test <- reduce(GRanges(trget$V1, IRanges(trget$V2, trget$V3)))
         
@@ -1006,7 +996,7 @@ server <- function(input, output) {
         ex_fo_pint3 <- pintersect(gr_blacklist[queryHits(ex_fo3)], exons_red[subjectHits(ex_fo3)])
         table_refseq_bl <- as.data.table(ex_fo_pint3) %>% group_by(group_name) %>% summarise(pcb_bl = sum(width))
         
-        table_refseq <<- left_join(
+        table_refseq <- left_join(
           left_join(table_refseq_cov, table_refseq_bl),
           table_refseq_covbl) %>% mutate(pcb_tot = sum(width(exons_red)), pcb_ncov = pcb_tot - pcb_covt, pcb_covp = pcb_cov / pcb_tot, pcb_covtp = pcb_covt / pcb_tot)
         colnames(table_refseq)[1] <- "gene"
@@ -1032,7 +1022,7 @@ server <- function(input, output) {
         
         # covered variants (excluding blacklisted)
         clv_fo_bl <- findOverlaps(gr_clinvar, gr_test_bl, type = "within")@from
-        clv_cov_bl <<- distinct(clv_gene_id[clv_fo_bl,])
+        clv_cov_bl <- distinct(clv_gene_id[clv_fo_bl,])
         table_clv_covbl <- as.data.frame(sort(table(clv_cov_bl$gene)))
         
         # total and specific blacklisted variants
@@ -1161,7 +1151,7 @@ server <- function(input, output) {
                       panelCatVersion = PanCatv
         )
         # comment the next line if hosting for others
-        saveRDS(panel, paste0("panels/", panel[["panelName"]],"_",format(Sys.time(), "%Y%m%d_%H%M%S"), ".panel"))
+        #saveRDS(panel, paste0("panels/", panel[["panelName"]],"_",format(Sys.time(), "%Y%m%d_%H%M%S"), ".panel"))
         
         currentpanel(panel)
         
