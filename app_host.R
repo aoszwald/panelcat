@@ -42,7 +42,6 @@
   
   # RefSeq loader
   loadRefSeq <- function(force) {
-    prepRefSeq(updateDb = F)
     if (exists("ex_by_ge") == F | force == T) {
       withProgress(message = "Loading RefSeq database", {
         ex_by_ge <<- readRDS(txdb_path)
@@ -51,8 +50,6 @@
   }
   
   loadExDb <- function() {
-    if (length(exdb_path) == 0) 
-      prepRefSeq(updateDb = F)
     if (exists("ex_by_ge_df1") == F) {
       ex_by_ge_df1 <<- readRDS(exdb_path)
     }
@@ -61,7 +58,6 @@
   loadClinVar <- function(updateDb) {
       if (exists("gr_clinvar") == F) {
         withProgress(message = "Loading ClinVar database", {
-          prepClinvar(updateDb = F)
         incProgress(0.5, detail = "Loading")
         sqldb_clinvar <- dbConnect(SQLite(), dbname=clv_path)
         gr_clinvar <<- GRanges(dbGetQuery(sqldb_clinvar, paste0('select CHROM from clinvar'))[,1],
@@ -75,7 +71,6 @@
   # COSMIC loader
   loadCosmic <- function() {
     withProgress(message = "Loading COSMIC database", {
-      prepCosmic()
       # check if ranges are loaded, if not, load
       incProgress(0.1, detail = "Loading")
       if (exists("gr_cmc") == F) {
@@ -128,8 +123,6 @@
   cmc_path <- list.files(pattern = "sqldb_cosmic_", full.names = T)[length(list.files(pattern = "sqldb_cosmic_"))]
   clv_path <- list.files(pattern = "sqldb_clinvar_", full.names = T)[length(list.files(pattern = "sqldb_clinvar_"))]
   clv_md5_path <- list.files(pattern = "clvmd5", full.names = T)[length(list.files(pattern = "clvmd5"))]
-  
-  infotext <- readLines("info.txt")
   
   # create translate dataframe for silly panelTable variables (find better solution)
   inputxyc <- data.frame(code = names(dbx[[1]][["panelTable"]]), display = c("gene",
@@ -237,17 +230,17 @@ ui <- ui <- fluidPage(
   mainPanel(
     tabsetPanel(
       id = "test",
-      tabPanel("Gene metrics, X/Y",span("Compare several target region metrics of two panels in an X/Y point graph (scatterplot). Each datapoint represents a gene. You can select two different panels, or compare different metrics within one panel. Below, you will find a contrast of the targeted genes."), 
+      tabPanel("Gene metrics, X/Y",span("Compare several target region metrics of two panels in an X/Y point graph (scatterplot). Each datapoint represents a gene. You can select two different panels, or compare different metrics within one panel. Below, you will find a contrast of the targeted genes. If selected 'Clinvar' or 'COSMIC', only pathogenic/likely pathogenic ClinVar variants and Tier 1-3 COSMIC census mutations are displayed (unlike in the ClinVar and COSMIC table tabs)."), 
                plotlyOutput("plot1"),
                verbatimTextOutput("stats")),
-      tabPanel("Gene metrics, column", span("Visualize per-gene coverage of one or multiple panels and the extent of variant masking. Do not select too many panels, or performance will suffer."),
+      tabPanel("Gene metrics, column", span("Visualize per-gene coverage of one or multiple panels and the extent of variant masking. Do not select too many panels, or performance will suffer. If selected 'Clinvar' or 'COSMIC', only pathogenic/likely pathogenic ClinVar variants and Tier 1-3 COSMIC census mutations are displayed (unlike in the ClinVar and COSMIC table tabs)."),
                plotOutput("plot2")),
       tabPanel("Gene metrics, search", span("Compare target regions of one or more genes of interest across one or multiple panels. Similar to barplot but more suitable for large number of panels."),
                verbatimTextOutput("unpanels"),
                plotlyOutput("plotGenes")),
-      tabPanel("Gene metrics, table", span("View the data used to construct the graphs in tabular form. "),
+      tabPanel("Gene metrics, table", span("View the data used to construct the graphs in tabular form. In this tab, only pathogenic/likely pathogenic ClinVar variants and Tier 1-3 COSMIC census mutations are displayed (unlike in the ClinVar and COSMIC table tabs)."),
                DT::dataTableOutput("table", width = 100)),
-      tabPanel("Non-covered mutation rate", span("View the estimated rate that tested samples will encounter mutations outside specified target regions. Mutation frequency is calculated from the COSMIC database, and does not take into account different tumor entities, or whether samples were analysed genome-wide or using targeted screens."),
+      tabPanel("Non-covered mutation rate", span("View the estimated rate that tested samples will encounter COSMIC Tier 1-3 census mutations outside specified target regions. Mutation frequency is calculated from the COSMIC database, and does not take into account different tumor entities, or whether samples were analysed genome-wide or using targeted screens."),
                plotlyOutput("nCovPosRate")),
       tabPanel("Exon graph", span("Compare targeted extent of individual exons of any single transcript across single or multiple panels. Hint: select the panels you wish to compare FIRST, because selecting new panels will discard your current gene/transcript selection."),
                plotlyOutput("exonCompP")),
@@ -270,9 +263,9 @@ ui <- ui <- fluidPage(
                span("You can initiate an update of RefSeq and ClinVar databases and a re-analysis of all currently loaded panels (13). To update COSMIC, you will have to remove the existing sqldb_cosmic_<date>_<time> file and place a current cmc_export.tsv in the db_ori folder."),
                tableOutput("contents"),
                tableOutput("maskFileContent")),
-      tabPanel("Info",span(""),
-               imageOutput("catpic"),
-               verbatimTextOutput("infotext"))
+      tabPanel("Info",
+               span("PanelCat is an open-soure application designed to analyse and visualise NGS panel target regions, and store the analyses for quick access.", tags$br(), "Research use only. PanelCat is released under AGPL-3 License. Author: André Oszwald."),
+               imageOutput("catpic"))
     ))
 )
 
@@ -298,9 +291,6 @@ server <- function(input, output) {
   if (length(cmc_path) == 0 & length(list.files(path = "db_ori", pattern="^cmc_export\\.tsv$")) == 0) {
     shinyalert(title = "Warning!", text  = "Please download COSMIC CMC database ('cmc_export.tsv' from https://cancer.sanger.ac.uk/cosmic) into the panelcat subdirectory 'db_ori'. You will need to create a COSMIC account. Proceeding without this file will lead to unexpected app behaviour.")
   }
-  
-  
-  output$infotext <- renderText(paste(infotext, collapse = "\n"))
   
   # define reactive input choices
   dbxn <- reactiveValues(panelNames = names(dbx), geneNames = all_genes)
@@ -939,9 +929,7 @@ server <- function(input, output) {
       withProgress(message = "Processing", {
         # load databases
         loadRefSeq(force = F)
-        prepClinvar(updateDb = F)
-        prepCosmic()
-        
+
         # make Granges of panel and mask
         gr_test <- reduce(GRanges(trget$V1, IRanges(trget$V2, trget$V3)))
         
