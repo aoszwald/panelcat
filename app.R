@@ -148,9 +148,8 @@ options(timeout = 360)
       # first, check if db exists or forced update, if not, create
       if ((length(clv_path) == 0 | updateDb == T) & debugMode == F) {
         incProgress(0.2, detail = "Preparing to process original database")
-        url <- "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh37/weekly/clinvar.vcf.gz.md5"
         tmp <- tempfile()
-        download.file(url, tmp)
+        download.file("https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh37/weekly/clinvar.vcf.gz.md5", tmp)
         clvMd5Serv <- readLines(tmp)
         saveRDS(clvMd5Serv, paste0("clvmd5_", format(Sys.time(), "%Y%m%d_%H%M%S"),".rds"))
         tmp <- tempfile()
@@ -222,8 +221,8 @@ options(timeout = 360)
         cmc_ori$end <- as.numeric(str_split_fixed(cmc_ori$coords, "-", 2)[,2])
         cmc_ori$COSMIC_SAMPLE_POSRATE <- cmc_ori$COSMIC_SAMPLE_MUTATED / cmc_ori$COSMIC_SAMPLE_TESTED
         cmc_ori <- cmc_ori[,c(
-          "GENE_NAME","CGC_TIER","Mutation CDS","Mutation AA","chr","start","end","COSMIC_SAMPLE_POSRATE","Mutation Description CDS","Mutation Description AA",
-          "GENOMIC_MUTATION_ID","MUTATION_SIGNIFICANCE_TIER"
+          "GENE_NAME", "GENOMIC_MUTATION_ID", "Mutation CDS","Mutation AA","chr","start","end","COSMIC_SAMPLE_POSRATE","Mutation Description CDS","Mutation Description AA",
+          "GENOMIC_MUTATION_ID","MUTATION_SIGNIFICANCE_TIER", "CGC_TIER"
         )]
         # save to sql
         incProgress(0.1, detail = "Saving")
@@ -906,26 +905,28 @@ server <- function(input, output) {
   table_muts <- reactive({
     loadCosmic()
     sqldb_cosmic <- dbConnect(SQLite(), dbname=cmc_path)
-    gr_test <- GRanges(dbx[[input$mutpanel]][["panelBed_input"]][["V1"]],
+    gr_test <<- GRanges(dbx[[input$mutpanel]][["panelBed_input"]][["V1"]],
                        IRanges(
                          dbx[[input$mutpanel]][["panelBed_input"]][["V2"]],
                          dbx[[input$mutpanel]][["panelBed_input"]][["V3"]]))
     if (input$hideCmcBl == T | length(dbx[[input$mutpanel]][["blacklist"]]) == 1) {
-      muts_overlaps <- findOverlaps(gr_test, gr_cmc, type = "within")@to
-      dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')'))
+      muts_overlaps <- findOverlaps(gr_cmc, gr_test, type = "within")@from
+      dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
+      mutate(GENOMIC_MUTATION_ID = sprintf('<a href="https://cancer.sanger.ac.uk/cosmic/search?q=%s" target="_blank"> %s </a>',GENOMIC_MUTATION_ID,GENOMIC_MUTATION_ID))
     } else {
-      gr_bl <- GRanges(dbx[[input$mutpanel]][["blacklist"]][["V1"]],
+      gr_bl <<- GRanges(dbx[[input$mutpanel]][["blacklist"]][["V1"]],
                        IRanges(
                          dbx[[input$mutpanel]][["blacklist"]][["V2"]],
                          dbx[[input$mutpanel]][["blacklist"]][["V3"]]))
-      gr_test_bl <- unlist(GenomicRanges::subtract(gr_test, gr_bl))
-      muts_overlaps <- findOverlaps(gr_test_bl, gr_cmc, type = "within")@to
-      dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')'))
+      gr_test_bl <<- unlist(GenomicRanges::subtract(gr_test, gr_bl))
+      muts_overlaps <- findOverlaps(gr_cmc, gr_test_bl, type = "within")@from
+      dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
+      mutate(GENOMIC_MUTATION_ID = sprintf('<a href="https://cancer.sanger.ac.uk/cosmic/search?q=%s" target="_blank"> %s </a>',GENOMIC_MUTATION_ID,GENOMIC_MUTATION_ID))
     }
   })
   
   output$cmcmuts <- DT::renderDataTable({
-    DT::datatable(table_muts(), 
+    DT::datatable(table_muts(), escape = F,
                   filter = list(position = "top", clear = F),
                   options = list(search = list(regex = TRUE, caseInsensitive = T)))
   })
@@ -941,23 +942,23 @@ server <- function(input, output) {
                          dbx[[input$clvpanel]][["panelBed_input"]][["V2"]],
                          dbx[[input$clvpanel]][["panelBed_input"]][["V3"]]))
     if (input$hideClvBl == T | length(dbx[[input$clvpanel]][["blacklist"]]) == 1) {
-      muts_overlaps <- findOverlaps(gr_test, gr_clinvar, type = "within")@to
+      muts_overlaps <- findOverlaps(gr_clinvar, gr_test, type = "within")@from
       dbGetQuery(sqldb_clinvar, paste0('SELECT * FROM clinvar WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
-        mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat))
+        mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat), ID = sprintf('<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=%s" target="_blank"> %s </a>',ID,ID))
     } else {
       gr_bl <- GRanges(dbx[[input$clvpanel]][["blacklist"]][["V1"]],
                        IRanges(
                          dbx[[input$clvpanel]][["blacklist"]][["V2"]],
                          dbx[[input$clvpanel]][["blacklist"]][["V3"]]))
       gr_test_bl <- unlist(GenomicRanges::subtract(gr_test, gr_bl))
-      muts_overlaps <- findOverlaps(gr_test_bl, gr_clinvar, type = "within")
+      muts_overlaps <- findOverlaps(gr_clinvar, gr_test_bl, type = "within")@from
       dbGetQuery(sqldb_clinvar, paste0('SELECT * FROM clinvar WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
-        mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat))
+        mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat), ID = sprintf('<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=%s" target="_blank"> %s </a>',ID,ID))
     }
   })
   
   output$clvmuts <- DT::renderDataTable({
-    DT::datatable(table_clvmuts(),
+    DT::datatable(table_clvmuts(), escape = F,
                   filter = list(position = "top", clear = F),
                   options = list(search = list(regex = TRUE, caseInsensitive = T)))
   })
