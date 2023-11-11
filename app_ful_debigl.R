@@ -911,7 +911,7 @@ server <- function(input, output) {
                          dbx[[input$mutpanel]][["panelBed_input"]][["V2"]],
                          dbx[[input$mutpanel]][["panelBed_input"]][["V3"]]))
     if (input$hideCmcBl == T | length(dbx[[input$mutpanel]][["blacklist"]]) == 1) {
-      muts_overlaps <- findOverlaps(gr_test, gr_cmc, type = "within")@to
+      muts_overlaps <- findOverlaps(gr_test, gr_cmc)@to
       dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')'))
     } else {
       gr_bl <- GRanges(dbx[[input$mutpanel]][["blacklist"]][["V1"]],
@@ -919,7 +919,7 @@ server <- function(input, output) {
                          dbx[[input$mutpanel]][["blacklist"]][["V2"]],
                          dbx[[input$mutpanel]][["blacklist"]][["V3"]]))
       gr_test_bl <- unlist(GenomicRanges::subtract(gr_test, gr_bl))
-      muts_overlaps <- findOverlaps(gr_test_bl, gr_cmc, type = "within")@to
+      muts_overlaps <- findOverlaps(gr_test_bl, gr_cmc)@to
       dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')'))
     }
   })
@@ -941,7 +941,7 @@ server <- function(input, output) {
                          dbx[[input$clvpanel]][["panelBed_input"]][["V2"]],
                          dbx[[input$clvpanel]][["panelBed_input"]][["V3"]]))
     if (input$hideClvBl == T | length(dbx[[input$clvpanel]][["blacklist"]]) == 1) {
-      muts_overlaps <- findOverlaps(gr_test, gr_clinvar, type = "within")@to
+      muts_overlaps <- findOverlaps(gr_test, gr_clinvar)@to
       dbGetQuery(sqldb_clinvar, paste0('SELECT * FROM clinvar WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
         mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat))
     } else {
@@ -950,7 +950,7 @@ server <- function(input, output) {
                          dbx[[input$clvpanel]][["blacklist"]][["V2"]],
                          dbx[[input$clvpanel]][["blacklist"]][["V3"]]))
       gr_test_bl <- unlist(GenomicRanges::subtract(gr_test, gr_bl))
-      muts_overlaps <- findOverlaps(gr_test_bl, gr_clinvar, type = "within")
+      muts_overlaps <- findOverlaps(gr_test_bl, gr_clinvar)
       dbGetQuery(sqldb_clinvar, paste0('SELECT * FROM clinvar WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
         mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat))
     }
@@ -1232,31 +1232,31 @@ server <- function(input, output) {
         
         # total muts in targeted genes
         cmc_gene_id <- dbGetQuery(sqldb_cosmic, paste0('select GENE_NAME, GENOMIC_MUTATION_ID, COSMIC_SAMPLE_POSRATE from cosmic where (MUTATION_SIGNIFICANCE_TIER != "Other" and GENE_NAME in (', paste(shQuote(gl_exp$refseq, type = "cmd"), collapse = ", "),'))'))
-        table_cmc_tot <- as.data.frame(table(cmc_gene_id$GENE_NAME))
+        table_cmc_tot <<- as.data.frame(table(cmc_gene_id$GENE_NAME))
         
         # covered variants (excluding blacklisted)
         cmc_fo_bl <- findOverlaps(gr_cmc, gr_test_bl, type = "within")@from
         cmc_cov_bl <- distinct(cmc_gene_id[cmc_fo_bl,])
-        table_cmc_covbl <- as.data.frame(table(cmc_cov_bl$GENE_NAME))
+        table_cmc_covbl <<- as.data.frame(table(cmc_cov_bl$GENE_NAME))
         
         # total and explicitly blacklisted variants
         cmc_fo <- findOverlaps(gr_cmc, gr_test, type = "within")@from
         cmc_cov <- distinct(cmc_gene_id[cmc_fo,])
-        table_cmc_covt <- as.data.frame(table(cmc_cov$GENE_NAME))
+        table_cmc_covt <<- as.data.frame(table(cmc_cov$GENE_NAME))
         cmc_bl <- cmc_cov[!(cmc_cov$GENOMIC_MUTATION_ID %in% cmc_cov_bl$GENOMIC_MUTATION_ID),]
         #table_cmc_bl <- as.data.frame(table(cmc_bl$GENE_NAME))
         if(!is.null(panelInput$mask)) {
-          table_cmc_bl <- as.data.frame(table(cmc_bl$GENE_NAME))
+          table_cmc_bl <<- as.data.frame(table(cmc_bl$GENE_NAME))
         } else {
-          table_cmc_bl <- data.frame("Var1" = gl_exp$refseq, "Freq" = 0)
+          table_cmc_bl <<- data.frame("Var1" = gl_exp$refseq, "Freq" = 0)
         }
         
         # NON covered variants (excluding blacklisted)
         cmc_ncov <- cmc_gene_id[!(cmc_gene_id$GENOMIC_MUTATION_ID %in% cmc_cov$GENOMIC_MUTATION_ID),]
         if (nrow(cmc_ncov) > 0) {
-          table_cmc_ncov <- as.data.frame(table(cmc_ncov$GENE_NAME))
+          table_cmc_ncov <<- as.data.frame(table(cmc_ncov$GENE_NAME))
         } else {
-          table_cmc_ncov <- data.frame("Var1" = gl_exp$refseq, "Freq" = 0)
+          table_cmc_ncov <<- data.frame("Var1" = gl_exp$refseq, "Freq" = 0)
         }
         
         # NON covered including blacklisted
@@ -1346,6 +1346,10 @@ server <- function(input, output) {
         panelInput$data <- NULL
         panelInput$mask <- NULL
         incProgress(0.1, detail = "Cleaning up")
+        #rm(gr_cmc, cmc_gene_id, cmc_id_posrate, cmc_covtp, cmc_covp, cmc_ncovbl_posTestRateTotal, cmc_ncov_posTestRateTotal, cmc_ncovbl_total, cmc_ncovbl_total, cmc_ncov_total, cmc_ncovbl_posTestRate, cmc_ncovbl_posTestRate, cmc_ncov_posTestRate, cmc_ncovbl,
+        #  gr_clv, clv_gene_id, clv_covtp, clv_covp, clv_ncov, clv_bl, clv_cov, clv_fo, clv_cov_bl, clv_fo_bl, clv_gene_id,
+        # panel,
+        #table_cmc, table_cmc_covt, table_cmc_covbl, table_cmc_tot, table_clv, table_clv_covt, table_clv_covbl, table_clv_tot, table_refseq, table_refseq, table_refseq_bl, table_refseq_covbl, table_refseq_cov, table_refseq_cov)
         gc()
         shinyalert(title = "complete")
       })
@@ -1501,7 +1505,7 @@ server <- function(input, output) {
         # covered variants (excluding blacklisted)
         cmc_fo_bl <- findOverlaps(gr_cmc, gr_test_bl, type = "within")@from
         cmc_cov_bl <- distinct(cmc_gene_id[cmc_fo_bl,])
-        table_cmc_covbl <- as.data.frame(table(cmc_cov_bl$GENE_NAME))
+        table_cmc_covbl <- as.data.frame(sort(table(cmc_cov_bl$GENE_NAME)))
         
         # total and explicitly blacklisted variants
         cmc_fo <- findOverlaps(gr_cmc, gr_test, type = "within")@from
