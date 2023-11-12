@@ -18,9 +18,12 @@ PanelCAT is also available via (http://panelcat.net)
 - PanelCat will then update all pre-supplied panel analyses using the updated databases.
 - The cmc_export.tsv file may be deleted after this step is complete.
 ## Installation - Linux
-- You can use the same steps as described above for Windows, but you may need to install additional Linux packages first. For Ubuntu, e.g., go into terminal and install the packages libcurl4-openssl-dev, libssl-dev, xml2-config and libxml2-dev using the command 
+- You can use the same steps as described above for Windows, but you may need to install additional Linux packages first. For Ubuntu, e.g., go into terminal and install the packages libcurl4-openssl-dev, libssl-dev, xml2-config and libxml2-dev, using
 ```bash 
-sudo apt install <package name>
+sudo apt install libcurl4-openssl-dev
+sudo apt install libssl-dev
+sudo apt install xml2-config
+sudo apt install libxml2-dev
 ```
 
 
