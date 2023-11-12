@@ -37,9 +37,6 @@ if (!require("BiocManager", quietly = TRUE)){
 if(!require(GenomicFeatures)){
   BiocManager::install("GenomicFeatures")
   library(GenomicFeatures)}
-if(!require(Seurat)){
-  BiocManager::install("Seurat")
-  library(Seurat)}
 if(!require(RSQLite)){
   install.packages("RSQLite")
   library(RSQLite)}
@@ -199,7 +196,9 @@ options(timeout = 360)
         # need RefSeq ex_by_ge for this
         loadRefSeq(force = F)
         incProgress(0.1, detail = "Preparing to process original database")
-        library(Seurat)
+        if(!require(Seurat)){
+          BiocManager::install("Seurat")
+          library(Seurat)}
         cmc_ori <- fread("db_ori/cmc_export.tsv")
         cmc_genes <- data.frame("ori" = setdiff(unique(cmc_ori$GENE_NAME), names(ex_by_ge)))
         cmc_genes$new <- cmc_genes$ori
@@ -898,7 +897,7 @@ server <- function(input, output) {
                   filter = list(position = "top", clear = F),
                   options = list(search = list(regex = TRUE, caseInsensitive = T), iDisplayLength = 100,
                                  columnDefs = list(
-                                   list(targets = 10, render = JS(render)),
+                                   list(targets = 10, render = DT::JS(render)),
                                    list(targets = 14, visible = F)
                                  ))) %>%
       formatRound(columns = c(12,13), digits = 5)

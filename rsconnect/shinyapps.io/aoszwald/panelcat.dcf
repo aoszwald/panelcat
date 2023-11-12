@@ -1,0 +1,13 @@
+name: panelcat
+title: panelcat
+username: aoszwald
+account: aoszwald
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 9324470
+bundleId: 7912392
+url: https://aoszwald.shinyapps.io/panelcat/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: app_full.R|db_ori/place_cmc_export.tsv_here|panelCat.pem|non_commit
