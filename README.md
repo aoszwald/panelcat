@@ -5,7 +5,7 @@ PanelCAT is also available via (https://aoszwald.shinyapps.io/panelcat)
 ## Installation - Windows
 - Install R Statistics (https://cran.rstudio.com/) and R Studio (https://posit.co/download/rstudio-desktop/)
 - Perform either of the following:
-- A) Install Git (https://git-scm.com/download/win) and clone the repository into an R Project (File -> New Project -> Version Control -> Git -> Repository URL: "https://github.com/aoszwald/panelcat" (without "") -> Create project as subdirectory of: Choose a folder you have read and write access to -> Create Project. 
+- A) Install Git (https://git-scm.com/download/win) and clone the repository into an R Project (File -> New Project -> Version Control -> Git -> Repository URL: https://github.com/aoszwald/panelcat -> Create project as subdirectory of: [Choose a folder you have read and write access to] -> Create Project. 
 - B) On the github repository, click the green "code" button, then "Download ZIP". Extract the folder "panelcat_main" and its contents in a location of your choice with read and write access. Finally, create a new project in the panelcat_main directory that contains App.R (File -> New Project -> Existing Directory -> Browse (and choose the panelcat_main directory containing "App.R" and the rest of the extracted files) -> Create Project.
 - Download the COSMIC Cancer Mutation Census data from https://cancer.sanger.ac.uk/cosmic/download (cmc_export.tsv) and place it in the db_ori folder.
 - This file needs to be downloaded manually because COSMIC downloads are only available to registered users. Please take note of the COSMIC license conditions for private and institutional users. 
