@@ -11,9 +11,10 @@ PanelCAT is also available via (http://panelcat.net)
 - Use your account to log in and download the COSMIC Cancer Mutation Census data from https://cancer.sanger.ac.uk/cosmic/download. Scroll down the list of files to "Cancer Mutation Census" and then press "All data CMC". Be sure to download the Genome GRCh37 version!
 - Using your archive software (e.g. 7zip), extract the contents of the downloaded .tar file and then extract the contents of the .gz file contained within. You may need an archive manager tool like 7zip to open the file. In Windows 11, it seems to be possible using the windows folder explorer.
 - Place the cmc_export.tsv file into the pre-existent db_ori subdirectory of the PanelCat R project directory. 
-- In R Studio, open the file app_full.R. In the right top corner of the window where the opened file is displayed, press the "Run App" button (with the green Arrow). Upon first start, R Studio will install the required packages (this may take a few minutes). Be sure to confirm any prompts about updates with "Yes".
+- The software has been tested with R version 4.2 and 4.3. Before proceeding, ensure that your base packages are current by entering "update.all(ask = F)" and pressing Enter into the console window.
+- In R Studio, open the file app_full.R. In the right top corner of the window where the opened file is displayed, press the "Run App" button (with the green Arrow). Upon first start, R Studio will install the required packages (This will take a while). Be sure to confirm any prompts about updates with "Yes".
 - Once the App starts, it will begin by downloading and processing the RefSeq database. This may take a few minutes.
-- Go to Tab "NewPanel" -> UPDATE ALL. PanelCat will acquire current RefSeq and Clinvar databases, and process the COSMIC CMC database. Processing the COSMIC database will take quite some time because the gene names will be updated (and this step is slow).
+- Go to Tab "New Analysis" -> UPDATE ALL (at the bottom of the left side panel). PanelCat will acquire current RefSeq and Clinvar databases, and process the COSMIC CMC database. Processing the COSMIC database will take quite some time because the gene names will be updated (and this step is slow).
 - PanelCat will then update all pre-supplied panel analyses using the updated databases.
 - The cmc_export.tsv file may be deleted after this step is complete.
 ## operation - basic
