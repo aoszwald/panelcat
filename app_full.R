@@ -37,6 +37,9 @@ if (!require("BiocManager", quietly = TRUE)){
 if(!require(GenomicFeatures)){
   BiocManager::install("GenomicFeatures")
   library(GenomicFeatures)}
+if(!require(Seurat)){
+  BiocManager::install("Seurat")
+  library(Seurat)}
 if(!require(RSQLite)){
   install.packages("RSQLite")
   library(RSQLite)}
@@ -75,7 +78,7 @@ options(timeout = 360)
     withProgress(message = "Preparing RefSeq database", {
       # if database path does not exist, create new
       if ((length(txdb_path) == 0 | updateDb == T) & debugMode == F) {
-        incProgress(0.3, detail = "Downoading")
+        incProgress(0.3, detail = "Downloading")
         txdb <- makeTxDbFromGFF("https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh37_latest/refseq_identifiers/GRCh37_latest_genomic.gff.gz",
                                  dataSource = "https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh37_latest/refseq_identifiers/GRCh37_latest_genomic.gff.gz")
         incProgress(0.3, detail = "Processing")
@@ -218,8 +221,7 @@ options(timeout = 360)
         cmc_ori$end <- as.numeric(str_split_fixed(cmc_ori$coords, "-", 2)[,2])
         cmc_ori$COSMIC_SAMPLE_POSRATE <- cmc_ori$COSMIC_SAMPLE_MUTATED / cmc_ori$COSMIC_SAMPLE_TESTED
         cmc_ori <- cmc_ori[,c(
-          "GENE_NAME", "GENOMIC_MUTATION_ID", "Mutation CDS","Mutation AA","chr","start","end","COSMIC_SAMPLE_POSRATE","Mutation Description CDS","Mutation Description AA",
-          "GENOMIC_MUTATION_ID","MUTATION_SIGNIFICANCE_TIER", "CGC_TIER"
+          "GENE_NAME", "GENOMIC_MUTATION_ID", "Mutation CDS","Mutation AA","chr","start","end","COSMIC_SAMPLE_POSRATE","Mutation Description CDS","Mutation Description AA","MUTATION_SIGNIFICANCE_TIER", "CGC_TIER"
         )]
         # save to sql
         incProgress(0.1, detail = "Saving")
