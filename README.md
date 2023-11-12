@@ -4,7 +4,7 @@ PanelCAT uses R and ShinyR, and is provided per AGPL-3 license, RESEARCH USE ONL
 PanelCAT is also available via (http://panelcat.net)
 ## Installation - Windows
 - Install R Statistics (https://cran.rstudio.com/) and R Studio (https://posit.co/download/rstudio-desktop/)
-- Perform either of the following:
+- Perform either of the following (A if you have, or want to use, Git version control software, or B if you do not):
 - A) Install Git (https://git-scm.com/download/win), open R Studio and clone the repository into an R Project (File -> New Project -> Version Control -> Git -> Repository URL: https://github.com/aoszwald/panelcat -> Create project as subdirectory of: [Choose a folder you have read and write access to] -> Create Project. 
 - B) On the github repository, click the green "code" button, then "Download ZIP". Extract the folder "panelcat_main" and its contents in a location of your choice with read and write access. Open R Studio and create a new R project in the panelcat_main directory that contains App.R: File -> New Project -> Existing Directory -> Browse (and choose the panelcat_main directory containing "App.R" and the rest of the extracted files) -> Create Project.
 - Register an account at https://cancer.sanger.ac.uk/cosmic/register.  Please take note of the COSMIC license conditions for private and institutional users. 
