@@ -1,7 +1,7 @@
 # panelCAT ReadMe (In progress!)
 PanelCAT is an open-source tool to analyse, visualise and compare NGS panel target regions. 
 PanelCAT uses R and ShinyR, and is provided per AGPL-3 license, RESEARCH USE ONLY.
-PanelCAT is also available via (https://aoszwald.shinyapps.io/panelcat)
+PanelCAT is also available via (http://panelcat.net)
 ## Installation - Windows
 - Install R Statistics (https://cran.rstudio.com/) and R Studio (https://posit.co/download/rstudio-desktop/)
 - Perform either of the following:
