@@ -1,6 +1,6 @@
 # PanelCAT ReadMe (In progress!)
 ## Introduction
-- NGS panels are widely used many areas of biological research and medicine. However, correct interpretation of variant calls often requires detailed understanding of the panel target regions. For instance, you may need to know precisely what portion of genes (and more specifically, which exons, or known mutations) are targeted by specific panels. It is useful to directly compare between panels that are available at your lab. PanelCAT (online available at http://panelcat.net) is an open-source tool to analyse, visualise and compare NGS panel target regions. PanelCAT uses R and ShinyR, and is provided per AGPL-3 license. PanelCat is not a clinically validated tool and designed for RESEARCH USE ONLY. 
+- NGS panels are widely used many areas of biological research and medicine. However, correct interpretation of variant calls often requires detailed understanding of the panel target regions. For instance, you may need to know precisely what portion of genes (and more specifically, which exons, or known mutations) are targeted by specific panels. It is useful to directly compare between panels that are available at your lab. PanelCAT (online available at http://panelcat.net) is an open-source tool to analyse, visualise and compare NGS panel target regions. PanelCAT uses R and ShinyR, and is provided per AGPL-3 license. PanelCat is NOT a clinically validated tool and designed for RESEARCH USE ONLY. 
 
 ## Installation - Windows
 - Install R Statistics (https://cran.rstudio.com/) and R Studio (https://posit.co/download/rstudio-desktop/).
@@ -29,7 +29,8 @@ sudo apt install libssl-dev
 sudo apt install xml2-config
 sudo apt install libxml2-dev
 ```
-
+## Installation on your own Shiny Server
+- in Progress
 ## operation - basic
 - Run "App_full.R" (for full functionality) or "App.R" (in case of hosting the app in a network, see details below)
 - View analyses results in different tabs. Most of the time, the presentation of results can be controlled by adjusting one or more input parameters.
