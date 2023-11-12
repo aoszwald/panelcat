@@ -6,3 +6,4 @@ cmc_export.*
 *Rhistory*
 *Rproj*
 /non_commit
+.Rproj.user

@@ -33,16 +33,13 @@ if(!require(randomcoloR)){
   install.packages("randomcoloR")
   library(randomcoloR)}
 if (!require("BiocManager", quietly = TRUE)){
-  install.packages("BiocManager")
-  #BiocManager::install(version = "3.17")
-  } 
+  install.packages("BiocManager")} 
 if(!require(GenomicFeatures)){
   BiocManager::install("GenomicFeatures")
   library(GenomicFeatures)}
 if(!require(RSQLite)){
   install.packages("RSQLite")
-  library(RSQLite)
-}
+  library(RSQLite)}
 options(repos = BiocManager::repositories())
 options(timeout = 360)
 
