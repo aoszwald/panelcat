@@ -46,7 +46,7 @@ options(timeout = 360)
 # Functions ---------------------------------------------------------------
 {
   # set true to always skip database update
-  debugMode <- F
+  debugMode <- T
   
   # PanCatversion
   PanCatv <- 29
@@ -1229,8 +1229,9 @@ server <- function(input, output) {
         ex_fo_pint2 <- pintersect(gr_test_bl[queryHits(ex_fo2)], exons_red[subjectHits(ex_fo2)])
         table_refseq_covbl <- as.data.table(ex_fo_pint2) %>% group_by(group_name) %>% summarise(pcb_cov = sum(width))
         
-        ex_fo3 <- findOverlaps(gr_blacklist, exons_red)
-        ex_fo_pint3 <- pintersect(gr_blacklist[queryHits(ex_fo3)], exons_red[subjectHits(ex_fo3)])
+        
+        ex_fo3 <- findOverlaps(intersect(gr_blacklist, gr_test), exons_red)
+        ex_fo_pint3 <- pintersect(intersect(gr_blacklist, gr_test)[queryHits(ex_fo3)], exons_red[subjectHits(ex_fo3)])
         table_refseq_bl <- as.data.table(ex_fo_pint3) %>% group_by(group_name) %>% summarise(pcb_bl = sum(width))
         
         table_refseq <- left_join(
@@ -1495,8 +1496,8 @@ server <- function(input, output) {
         ex_fo_pint2 <- pintersect(gr_test_bl[queryHits(ex_fo2)], exons_red[subjectHits(ex_fo2)])
         table_refseq_covbl <- as.data.table(ex_fo_pint2) %>% group_by(group_name) %>% summarise(pcb_cov = sum(width))
         
-        ex_fo3 <- findOverlaps(gr_blacklist, exons_red)
-        ex_fo_pint3 <- pintersect(gr_blacklist[queryHits(ex_fo3)], exons_red[subjectHits(ex_fo3)])
+        ex_fo3 <- findOverlaps(intersect(gr_blacklist, gr_test), exons_red)
+        ex_fo_pint3 <- pintersect(intersect(gr_blacklist, gr_test)[queryHits(ex_fo3)], exons_red[subjectHits(ex_fo3)])
         table_refseq_bl <- as.data.table(ex_fo_pint3) %>% group_by(group_name) %>% summarise(pcb_bl = sum(width))
         
         table_refseq <- left_join(
