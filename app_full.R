@@ -477,7 +477,7 @@ server <- function(input, output) {
   options(shiny.maxRequestSize=500*1024^2)
   
   observe({
-    shinyalert("DISCLAIMER and user agreement:", text = "This software is intended for reasearch use only, and not intended to make medical decisions. By proceeding, the user agrees to take sole responsibility, and not to hold the authors/providers of this software responsible, for any decisions based on information obtained through this application.", confirmButtonText = "I understand and agree.", closeOnEsc = F)
+    shinyalert("DISCLAIMER and user agreement:", text = "This software is intended for reasearch use only, and not intended to make medical decisions. By proceeding, the user agrees to take sole responsibility, and not to hold the authors/providers of this software responsible, for any decisions based on information obtained through this application.", confirmButtonText = "I understand and agree.", confirmButtonCol = "darkblue", closeOnEsc = F)
   })
   
   # check if DBs loaded
@@ -951,6 +951,7 @@ server <- function(input, output) {
         geom_col(d = exoncovd2(), aes(x = exon, y = case_when(input$exoncomp_rel == "absolute" ~ covt_width,
                                                               input$exoncomp_rel == "relative" ~ covtp),
                                       fill = panel), position = "dodge", alpha = 0.2) +
+        theme(legend.position = "none") +
         geom_col(d = exoncovd2(), aes(x = exon, y = case_when(input$exoncomp_rel == "absolute" ~ cov_width,
                                                               input$exoncomp_rel == "relative" ~ covp), 
                                       fill = panel), color = "black", size = 0.05, position = "dodge") +
