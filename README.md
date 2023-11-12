@@ -17,6 +17,13 @@ PanelCAT is also available via (http://panelcat.net)
 - Go to Tab "New Analysis" -> UPDATE ALL (at the bottom of the left side panel). PanelCat will acquire current RefSeq and Clinvar databases, and process the COSMIC CMC database. Processing the COSMIC database will take quite some time because the gene names will be updated (and this step is slow).
 - PanelCat will then update all pre-supplied panel analyses using the updated databases.
 - The cmc_export.tsv file may be deleted after this step is complete.
+## Installation - Linux
+- You can use the same steps as described above for Windows, but you may need to install additional Linux packages first. For Ubuntu, e.g., go into terminal and install the packages libcurl4-openssl-dev, libssl-dev, xml2-config and libxml2-dev using the command 
+```bash 
+sudo apt install <package name>
+```
+
+
 ## operation - basic
 - Run "App_full.R" (for full functionality) or "App.R" (in case of hosting the app in a network, see details below)
 - View analyses results in different tabs. Most of the time, the presentation of results can be controlled by adjusting one or more input parameters.
