@@ -1,7 +1,7 @@
 # PanelCAT ReadMe (In progress!)
 ## Introduction
 - NGS panels are widely used many areas of biological research and medicine. However, correct interpretation of variant calls often requires detailed understanding of the panel target regions. For instance, you may need to know precisely what portion of genes (and more specifically, which exons, or known mutations) are targeted by specific panels. It is useful to directly compare between panels that are available at your lab. PanelCAT (online available at http://panelcat.net) is an open-source tool to analyse, visualise and compare NGS panel target regions. PanelCAT uses R and ShinyR, and is provided per AGPL-3 license. PanelCat is NOT a clinically validated tool and designed for RESEARCH USE ONLY. 
-
+- Regarding BED file format and zero-based indexed coordinates, see https://en.wikipedia.org/wiki/BED_(file_format)#Coordinate_system.
 ## Installation - Windows
 - Install R Statistics (https://cran.rstudio.com/) and R Studio (https://posit.co/download/rstudio-desktop/).
 - Perform either of the following (A if you have, or want to use, Git version control software, or B if you do not):
