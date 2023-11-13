@@ -405,7 +405,7 @@
         uiOutput("exoncomp_panelsel"),
         uiOutput("exoncovgsel"),
         uiOutput("exoncovtsel"),
-        selectInput("exoncomp_rel","display",c("absolute","relative"), selected = "absolute"),
+        radioButtons("exoncomp_rel","display",c("absolute","relative"), selected = "absolute"),
         checkboxInput("showTipExGr", "Show tool tips", value = T)
       ),
       conditionalPanel(
@@ -413,13 +413,14 @@
         uiOutput("mutpanelsel"),
         checkboxInput("hideCmcBl","Hide masked", value = T),
         checkboxInput("showTipCosTab", "Show tool tips", value = T),
-        span(tags$b("CGC Tier: "),"COSMIC cancer gene census Tier",tags$br(), tags$b("CDS: "),"Coding sequence",tags$br(), tags$b("AA: "),"Amino acid",tags$br(), tags$b("CMC Tier: "),"COSMIC cancer mutation census Tier")
+        span(tags$b("CDS: "),"Coding sequence",tags$br(), tags$br(), tags$b("AA: "),"Amino acid",tags$br(), tags$br(), tags$b("CMC Tier: "),"COSMIC cancer mutation census Tier",tags$br(), tags$br(), tags$b("CGC Tier: "),"COSMIC cancer gene census Tier")
       ),
       conditionalPanel(
         condition = "input.test == 'ClinVar table'",
         uiOutput("clvpanelsel"),
         checkboxInput("hideClvBl","Hide masked", value = T),
-        checkboxInput("showTipClvTab", "Show tool tips", value = T)
+        checkboxInput("showTipClvTab", "Show tool tips", value = T),
+        span(tags$b("REF: "),"Reference allele",tags$br(), tags$br(), tags$b("ALT: "), "Alternate allele", tags$br(), tags$br(), tags$b("ClnSig: "), "Clinical significance", tags$br(), tags$br(), tags$b("ClnRevStat: "),"Clinical review status")
       ),
       conditionalPanel(
         condition = "input.test=='Non-covered mutation rate'",
@@ -533,7 +534,7 @@
     
     # tooltips
     output$textXY <- renderText({if (input$showTipXY == T) {HTML("Compare target region metrics of panels in an X/Y point graph (scatterplot). Each datapoint represents a gene and the corresponding coverage of total coding (exonic) bases, or known mutations from ClinVar or COSMIC databases. You can compare metrics between two different panels, or different metrics within the same panel.</br>Below the graph, you will find a text box contrasting the different sets of target genes.</br>The RefSeq metrics refer to the sum of all exon-coding bases of all transcripts of a gene. The ClinVar or COSMIC metrics include only pathogenic/likely pathogenic ClinVar variants and Tier 1-3 COSMIC census mutations (unlike the tabs 'ClinVar table' and 'COSMIC table').")} else {""}})
-    output$textCol <- renderText({if (input$showTipCol == T) {HTML("Visualize coverage of coding bases, or Clinvar/COSMIC mutations all target genes of one or multiple panels and the extent of variant masking. Each horizontal column (or set of columns, if multiple panels are selected) represents one target gene.</br>The light gray bar represents the sum of all known exon bases of all transcripts, or the total number of known ClinVar / COSMIC mutations, per gene (i.e., the maximum that can be attained). The opaque bar in the foreground represents the coverage of coding bases or mutations by a selected panel. <b>The color mapping will change if panel selection is changed.</b></br>Masked bases or variants are indicated by a lighter shade of same color of the foreground. If you are unsure what this looks like, select the TSO500 and look at the genes KMT2B-D.</br>The ClinVar or COSMIC metrics include only pathogenic/likely pathogenic ClinVar variants and Tier 1-3 COSMIC census mutations (unlike the tabs 'ClinVar table' and 'COSMIC table').</br>Do not select too many panels, or performance will suffer. Consider using the 'Gene Metrics, Search' function instead.")} else {""}})
+    output$textCol <- renderText({if (input$showTipCol == T) {HTML("Visualize coverage of coding bases, or Clinvar/COSMIC mutations all target genes of one or multiple panels and the extent of variant masking. Each horizontal column (or set of columns, if multiple panels are selected) represents one target gene.</br>The light gray bar represents the sum of all known exon bases of all transcripts, or the total number of known ClinVar / COSMIC mutations, per gene (i.e., the maximum that can be attained). The opaque bar in the foreground represents the coverage of coding bases or mutations by a selected panel. <b>The color mapping will change if panel selection is changed.</b></br>Masked bases or variants are indicated by a lighter shade of same color of the foreground. If you are unsure what this looks like, select the TSO500 and look at the genes KMT2B-D.</br>The ClinVar or COSMIC metrics include only pathogenic/likely pathogenic ClinVar variants and Tier 1-3 COSMIC census mutations (unlike the tabs 'ClinVar table' and 'COSMIC table').</br>You can right-click the graph and save image as a .png image file. Do not select too many panels, or performance will suffer. Consider using the 'Gene Metrics, Search' function instead.")} else {""}})
     output$textSearch <- renderText({if (input$showTipSearch == T) {HTML("Visualize coverage of coding bases, or Clinvar/COSMIC mutations of one or more genes of interest across one or multiple panels. Each horizontal column (or set of columns, if multiple panels are selected) represents one target gene. </br>The light gray shaded bar represents the sum of all known exon bases of all transcripts, or the total number of known ClinVar / COSMIC mutations, per gene (i.e., the maximum that can be attained). The opaque bar in the foreground represents the coverage by a selected panel. <b>The color mapping will change if panel selection is changed.</b></br>Masked bases or variants are indicated by a lighter shade of same color of the foreground. If you are unsure what this looks like, select the TSO500 and look at the genes KMT2B-D</br>The ClinVar or COSMIC metrics include only pathogenic/likely pathogenic ClinVar variants and Tier 1-3 COSMIC census mutations (unlike the tabs 'ClinVar table' and 'COSMIC table').</br>Since only selected genes are displayed at a time, performance is acceptable when comparing large numbers of panels.")} else {""}})
     output$textTable <- renderText({if (input$showTipTable == T) {HTML("View the data used to construct the graphs in tabular form. You can select as many panels and as many metrics as you like to compare (but beware, the table will eventually become very wide).</br>The ClinVar or COSMIC metrics include only pathogenic/likely pathogenic ClinVar variants and Tier 1-3 COSMIC census mutations (unlike the tabs 'ClinVar table' and 'COSMIC table').</br>You may download the currently selected data in tabular form (the export will be filtered based on your input).")} else {""}})
     output$textNonCov <- renderText({if (input$showTipNonCov == T) {HTML("View the estimated rate of tested samples harboring COSMIC Tier 1-3 census mutations that will not be detected with a panel because they lie outside the specified target regions. The estimation is derived from the number of positive samples, and the number of samples tested for this mutation, documented in the COSMIC database. The estimate does not account for different tumor entities, or whether samples were analysed using either genome-wide or targeted screens.")} else {""}})
@@ -589,6 +590,7 @@
       selectInput('exoncomp_panel', 'Panels (choose multiple)', dbxn$panelNames, selected = dbxn$panelNames[1], multiple = T)
     })
     output$exoncovgsel <- renderUI({
+      validate(need(input$exoncomp_panel, "Select at least one panel"))
       selectInput('exoncovg', 'Gene', exoncovd()[["group_name"]], selected = exoncovd()[["group_name"]][1])
     })
     output$exoncovtsel <- renderUI({
@@ -1012,8 +1014,8 @@
         muts_overlaps <- findOverlaps(gr_cmc, gr_test, type = "within")@from
         dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
         mutate(GENOMIC_MUTATION_ID = sprintf('<a href="https://cancer.sanger.ac.uk/cosmic/search?q=%s" target="_blank"> %s </a>',GENOMIC_MUTATION_ID,GENOMIC_MUTATION_ID),
-               `Mutation Description AA` = as.factor(`Mutation Description AA`), `Mutation Description CDS` = as.factor(`Mutation Description CDS`, `Mutation ID` = as.factor(`Mutation ID`))) %>%
-        setNames(c("gene","CGC tier","Mutation CDS","Mutation AA","chrom","start","end","COSMIC frequency","Mutation Description CDS","Mutation Description AA","Mutation ID","CMC Tier"))
+               `Mutation Description CDS` = as.factor(`Mutation Description CDS`), `Mutation Description AA` = as.factor(`Mutation Description AA`)) %>%
+        setNames(c("gene","Mutation ID","Mutation CDS","Mutation AA","chrom","start","end","COSMIC frequency","Mutation Description CDS","Mutation Description AA","CMC Tier","CGC Tier"))
       } else {
         gr_bl <- GRanges(dbx[[input$mutpanel]][["blacklist"]][["V1"]],
                          IRanges(
@@ -1023,8 +1025,8 @@
         muts_overlaps <- findOverlaps(gr_cmc, gr_test_bl, type = "within")@from
         dbGetQuery(sqldb_cosmic, paste0('SELECT * FROM cosmic WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
         mutate(GENOMIC_MUTATION_ID = sprintf('<a href="https://cancer.sanger.ac.uk/cosmic/search?q=%s" target="_blank"> %s </a>',GENOMIC_MUTATION_ID,GENOMIC_MUTATION_ID),
-               `Mutation Description AA` = as.factor(`Mutation Description AA`), `Mutation Description CDS` = as.factor(`Mutation Description CDS`, `Mutation ID` = as.factor(`Mutation ID`))) %>%
-        setNames(c("gene","CGC tier","Mutation CDS","Mutation AA","chromosome","COSMIC frequency","Mutation Description CDS","Mutation Description AA","Mutation ID","CMC Tier"))
+        `Mutation Description CDS` = as.factor(`Mutation Description CDS`), `Mutation Description AA` = as.factor(`Mutation Description AA`)) %>%
+        setNames(c("gene","Mutation ID","Mutation CDS","Mutation AA","chrom","start","end","COSMIC frequency","Mutation Description CDS","Mutation Description AA","CMC Tier","CGC Tier"))
       }
     })
     
@@ -1049,7 +1051,8 @@
       if (input$hideClvBl == T | length(dbx[[input$clvpanel]][["blacklist"]]) == 1) {
         muts_overlaps <- findOverlaps(gr_clinvar, gr_test, type = "within")@from
         dbGetQuery(sqldb_clinvar, paste0('SELECT * FROM clinvar WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
-          mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat), ID = sprintf('<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=%s" target="_blank"> %s </a>',ID,ID))
+          mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat), ID = sprintf('<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=%s" target="_blank"> %s </a>',ID,ID)) %>%
+          setNames(c("gene","chrom","start","ID","REF","ALT","ClinSig","ClnRevStat"))
       } else {
         gr_bl <- GRanges(dbx[[input$clvpanel]][["blacklist"]][["V1"]],
                          IRanges(
@@ -1058,7 +1061,8 @@
         gr_test_bl <- unlist(GenomicRanges::subtract(gr_test, gr_bl))
         muts_overlaps <- findOverlaps(gr_clinvar, gr_test_bl, type = "within")@from
         dbGetQuery(sqldb_clinvar, paste0('SELECT * FROM clinvar WHERE rowid IN (', paste(muts_overlaps, collapse = ","),')')) %>%
-          mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat), ID = sprintf('<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=%s" target="_blank"> %s </a>',ID,ID))
+          mutate(gene = as.factor(gene), CHROM = as.factor(CHROM), clnsig = as.factor(clnsig), clnrevstat = as.factor(clnrevstat), ID = sprintf('<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=%s" target="_blank"> %s </a>',ID,ID)) %>%
+          setNames(c("gene","chrom","start","ID","REF","ALT","ClinSig","ClnRevStat"))
       }
     })
     
