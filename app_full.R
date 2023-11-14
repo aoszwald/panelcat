@@ -46,7 +46,7 @@
   # Functions ---------------------------------------------------------------
   {
     # set true to always skip database update
-    debugMode <- T
+    debugMode <- F
     
     # PanCatversion
     PanCatv <- 29
@@ -1228,6 +1228,8 @@
             blacklist$V3 <- as.numeric(blacklist$V3)
             names(blacklist) <- c("V1", "V2","V3")
             gr_blacklist <- GRanges(blacklist$V1, IRanges(blacklist$V2, blacklist$V3))
+          } else {
+            gr_blacklist <- GRanges()
           }
           
           gr_test_bl <- reduce(unlist(subtract(gr_test, gr_blacklist)))
@@ -1270,8 +1272,13 @@
           ex_fo_pint2 <- pintersect(gr_test_bl[queryHits(ex_fo2)], exons_red[subjectHits(ex_fo2)])
           table_refseq_covbl <- as.data.table(ex_fo_pint2) %>% group_by(group_name) %>% summarise(pcb_cov = sum(width))
           
+          if (!is.null(panelInput$mask)) {
+            ex_fo3 <- findOverlaps(intersect(gr_blacklist, gr_test), exons_red)
+          }
+          if (is.null(panelInput$mask)) {
+            ex_fo3 <- findOverlaps(gr_blacklist, exons_red)
+          }
           
-          ex_fo3 <- findOverlaps(intersect(gr_blacklist, gr_test), exons_red)
           ex_fo_pint3 <- pintersect(intersect(gr_blacklist, gr_test)[queryHits(ex_fo3)], exons_red[subjectHits(ex_fo3)])
           table_refseq_bl <- as.data.table(ex_fo_pint3) %>% group_by(group_name) %>% summarise(pcb_bl = sum(width))
           
@@ -1537,7 +1544,12 @@
           ex_fo_pint2 <- pintersect(gr_test_bl[queryHits(ex_fo2)], exons_red[subjectHits(ex_fo2)])
           table_refseq_covbl <- as.data.table(ex_fo_pint2) %>% group_by(group_name) %>% summarise(pcb_cov = sum(width))
           
-          ex_fo3 <- findOverlaps(intersect(gr_blacklist, gr_test), exons_red)
+          if (length(dbx[[j]][["blacklist"]]) == 1) {
+            ex_fo3 <- findOverlaps(gr_blacklist, exons_red)
+          }
+          if (length(dbx[[j]][["blacklist"]]) >= 3) {
+            ex_fo3 <- findOverlaps(intersect(gr_blacklist, gr_test), exons_red)
+          }
           ex_fo_pint3 <- pintersect(intersect(gr_blacklist, gr_test)[queryHits(ex_fo3)], exons_red[subjectHits(ex_fo3)])
           table_refseq_bl <- as.data.table(ex_fo_pint3) %>% group_by(group_name) %>% summarise(pcb_bl = sum(width))
           
