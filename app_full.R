@@ -851,7 +851,7 @@
         need(input$genes, 'Please select at least one target gene'),
         need(input$panelgenes, 'Please select at least one panel'),
       )
-      genegraph <<- ggplotly(
+      genegraph <- ggplotly(
         ggplot() +
           geom_col(d = genes_tot(), aes(y = gene, x = width, fill = "total")) +
           geom_col(d = bars_gene(), aes(y = gene, x = case_when(input$dtsetgenes == "RefSeq coding bases" & input$dtsetrelg == "absolute" ~ pcb_covt,
@@ -977,7 +977,7 @@
         need(input$exoncovg, 'Please select one gene'),
         need(input$exoncovt, 'Please select one trx')
       )
-      exonplot <<- ggplotly(
+      exonplot <- ggplotly(
         ggplot() +
           geom_col(d = exoncovd2() %>% 
                      group_by(exon) %>%
@@ -1273,13 +1273,7 @@
           ex_fo_pint2 <- pintersect(gr_test_bl[queryHits(ex_fo2)], exons_red[subjectHits(ex_fo2)])
           table_refseq_covbl <- as.data.table(ex_fo_pint2) %>% group_by(group_name) %>% summarise(pcb_cov = sum(width))
           
-          if (!is.null(panelInput$mask)) {
-            ex_fo3 <- findOverlaps(IRanges::intersect(gr_blacklist, gr_test), exons_red)
-          }
-          if (is.null(panelInput$mask)) {
-            ex_fo3 <- findOverlaps(gr_blacklist, exons_red)
-          }
-          
+          ex_fo3 <- findOverlaps(IRanges::intersect(gr_blacklist, gr_test), exons_red)
           ex_fo_pint3 <- pintersect(intersect(gr_blacklist, gr_test)[queryHits(ex_fo3)], exons_red[subjectHits(ex_fo3)])
           table_refseq_bl <- as.data.table(ex_fo_pint3) %>% group_by(group_name) %>% summarise(pcb_bl = sum(width))
           
