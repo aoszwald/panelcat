@@ -32,14 +32,17 @@
   if(!require(randomcoloR)){
     install.packages("randomcoloR")
     library(randomcoloR)}
+  if(!require(RSQLite)){
+    install.packages("RSQLite")
+    library(RSQLite)}
   if (!require("BiocManager", quietly = TRUE)){
     install.packages("BiocManager")} 
   if(!require(GenomicFeatures)){
     BiocManager::install("GenomicFeatures")
     library(GenomicFeatures)}
-  if(!require(RSQLite)){
-    install.packages("RSQLite")
-    library(RSQLite)}
+  if(!require(Seurat)){
+    BiocManager::install("Seurat")}
+
   options(repos = BiocManager::repositories())
   options(timeout = 360)
   
@@ -227,9 +230,7 @@
           # need RefSeq ex_by_ge for this
           loadRefSeq(force = F)
           incProgress(0.1, detail = "Preparing to process original database")
-          if(!require(Seurat)){
-            BiocManager::install("Seurat")
-            library(Seurat)}
+          library(Seurat)
           cmc_ori <- fread("db_ori/cmc_export.tsv")
           cmc_genes <- data.frame("ori" = setdiff(unique(cmc_ori$GENE_NAME), names(ex_by_ge)))
           cmc_genes$new <- cmc_genes$ori
