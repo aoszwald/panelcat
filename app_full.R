@@ -1274,7 +1274,7 @@
           table_refseq_covbl <- as.data.table(ex_fo_pint2) %>% group_by(group_name) %>% summarise(pcb_cov = sum(width))
           
           if (!is.null(panelInput$mask)) {
-            ex_fo3 <- findOverlaps(intersect(gr_blacklist, gr_test), exons_red)
+            ex_fo3 <- findOverlaps(IRanges::intersect(gr_blacklist, gr_test), exons_red)
           }
           if (is.null(panelInput$mask)) {
             ex_fo3 <- findOverlaps(gr_blacklist, exons_red)
