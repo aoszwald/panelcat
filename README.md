@@ -3,6 +3,8 @@
 2. [Installation - Windows](#installation---windows)
 3. [Installation - Linux](#installation---linux)
 4. [Installation on your own Shiny server](#installation-on-your-own-shiny-server)
+5. [New panel analysis](#new-panel-analysis)
+6. [Advanced](#advanced)
 ## Introduction
 - NGS panels are widely used many areas of biological research and medicine. However, correct interpretation of variant calls often requires detailed understanding of the panel target regions. For instance, you may need to know precisely what portion of genes (and more specifically, which exons, or known mutations) are targeted by specific panels. It is useful to directly compare between panels that are available at your lab. PanelCAT (online available at http://panelcat.net) is an open-source tool to analyse, visualise and compare NGS panel target regions. PanelCAT uses R and ShinyR, and is provided per AGPL-3 license. PanelCat is NOT a clinically validated tool and designed for RESEARCH USE ONLY. 
 - Regarding BED file format and zero-based indexed coordinates, see https://en.wikipedia.org/wiki/BED_(file_format)#Coordinate_system.
@@ -47,10 +49,7 @@ sudo apt install libxml2-dev
 sudo chown shiny:shiny /srv/shiny-server/panelcat
 ```
 - ... but do so at your own risk, since it may compromise the security of your system.
-## operation - basic
-- Run "App_full.R" (for full functionality) or "App.R" (in case of hosting the app in a network, see details below)
-- View analyses results in different tabs. Most of the time, the presentation of results can be controlled by adjusting one or more input parameters.
-## operation - New panel analysis
+## New panel analysis
 - PanelCat uses hg19 (GRCh37) based databases. Please ensure that your target region file is also hg19 (GRCh37) based.
 - To analyse a new panel, go to the "NewPanel" tab. Target regions need to be provided as a tab-separated table (typically .bed or .txt) that includes the following columns: Chromosome, Start, Stop (e.g. chr1	27100287	27100394). Additional columns may be present.
 - Note that the chromosome ID needs the "chr" prefix, e.g. "chr1" (not "1"), or "chrX" (not "X").
@@ -58,11 +57,9 @@ sudo chown shiny:shiny /srv/shiny-server/panelcat
 - If the first three columns of the table do not exactly match the columns Chromosome, Start, Stop (in this order), specify the column number and order (e.g. "2,3,1")
 - Optionally, provide a mask file (again .bed or .txt) in the same manner as the target regions file.
 - Press "start". Once completed, the panel analyses will be either permanently stored within the "panels" subfolder (when using "App_full.R"), or only temporarily available within the current R session / Shiny server instance (App.R). When using App.R, you can download the analysis result, and upload it to the software at a later time.
-## operation - advanced
+## Advanced
 - Analysed panels are stored in the "panels" subfolder.
 - Every time panels are analysed or updated, a new file or version of a file is created. These files can be manually removed, replaced, etc.
 - PanelCAT will load the most recent version of each panel analysis upon start.
 - In case the most recent panel analyses were not all analyzed using the same reference databases, a warning will be issued on startup. This problem can be solved by updating all panels.
 - In case panel analyses were not all analyzed using the same version of PanelCat, an error will be issued on startup. This problem can be solved by first updating all panels analyzed with the outdated version using the newer panelcat version, and then adding the newer panels. Alternatively, it is possible to perform new analyses of each panel (this may be easier)
-
-- "App.R" does not include functions to permanently save panel analyses or update panels. This version of the software should be run when using a hosting platform such as shinyserver (https://posit.co/products/open-source/shinyserver/). This is also the version available at (https://aoszwald.shinyapps.io/panelcat)
