@@ -6,7 +6,9 @@
 - Install R Statistics (https://cran.rstudio.com/) and R Studio (https://posit.co/download/rstudio-desktop/).
 - Perform either of the following (A if you have, or want to use, Git version control software, or B if you do not):
 - A) Install Git (https://git-scm.com/download/win), open R Studio and clone the repository into an R Project (File -> New Project -> Version Control -> Git -> Repository URL: https://github.com/aoszwald/panelcat -> Create project as subdirectory of: [Choose a folder you have read and write access to] -> Create Project. 
-- B) On the github repository, click the green "code" button, then "Download ZIP". Extract the folder "panelcat_main" and its contents in a location of your choice with read and write access. Open R Studio and create a new R project in the panelcat_main directory that contains App.R: File -> New Project -> Existing Directory -> Browse (and choose the panelcat_main directory containing "App.R" and the rest of the extracted files) -> Create Project.
+- B) On the github repository, click the green "code" button, then "Download ZIP". Extract the folder "panelcat_main" and its contents in a location of your choice with read and write access. 
+- You may wish to rename the directory from "panelcat_main" to "panelcat" for simplicity.
+Open R Studio and create a new R project in the panelcat_main directory that contains App.R: File -> New Project -> Existing Directory -> Browse (and choose the panelcat_main directory containing "App.R" and the rest of the extracted files) -> Create Project.
 - Register an account at https://cancer.sanger.ac.uk/cosmic/register.  Please take note of the COSMIC license conditions for private and institutional users. 
 - Use your account to log in and download the COSMIC Cancer Mutation Census data from https://cancer.sanger.ac.uk/cosmic/download. Scroll down the list of files to "Cancer Mutation Census" and then press "All data CMC". Be sure to download the Genome GRCh37 version!
 - Using your archive software (e.g. 7zip), extract the contents of the downloaded .tar file and then extract the contents of the .gz file contained within. You may need an archive manager tool like 7zip to open the file. In Windows 11, it seems to be possible using the windows folder explorer.
@@ -30,7 +32,8 @@ sudo apt install xml2-config
 sudo apt install libxml2-dev
 ```
 ## Installation on your own Shiny Server
-- in Progress
+- This is only possible using a Linux environment (you may use a virtual machine, but this is beyond the scope of this guide). Assuming you are using Ubuntu: Download and install shiny server (https://posit.co/download/shiny-server/). Place the "panelcat" directory (the one that contains "App.R") into the directory /srv/shiny-server/
+-  By default, shiny server will start one server process listening on port 3838 (this means you will access the panelcat app running on your server by entering e.g. "123.456.789.12:3838/panelcat" (123.456.789.12 being a placeholder for your IP in the network). The name of the app that you need to specify is equal to the name of the directory that contains the respective App.R file.
 ## operation - basic
 - Run "App_full.R" (for full functionality) or "App.R" (in case of hosting the app in a network, see details below)
 - View analyses results in different tabs. Most of the time, the presentation of results can be controlled by adjusting one or more input parameters.
