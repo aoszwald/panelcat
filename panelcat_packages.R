@@ -1,0 +1,44 @@
+# Dependencies ------------------------------------------------------------
+if(!require(shiny)){
+  install.packages("shiny")
+  library(shiny)}
+if(!require(shinyjs)){
+  install.packages("shinyjs")
+  library(shinyjs)}
+if(!require(ggplot2)){
+  install.packages("ggplot2")
+  library(ggplot2)}
+if(!require(plotly)){
+  install.packages("plotly")
+  library(plotly)}
+if(!require(DT)){
+  install.packages("DT")
+  library(DT)}
+if(!require(shinyalert)){
+  install.packages("shinyalert")
+  library(shinyalert)}
+if(!require(data.table)){
+  install.packages("data.table")
+  library(data.table)}
+if(!require(stringr)){
+  install.packages("stringr")
+  library(stringr)}
+if(!require(tidyr)){
+  install.packages("tidyr")
+  library(tidyr)}
+if(!require(dplyr)){
+  install.packages("dplyr")
+  library(dplyr)}
+if(!require(randomcoloR)){
+  install.packages("randomcoloR")
+  library(randomcoloR)}
+if(!require(RSQLite)){
+  install.packages("RSQLite")
+  library(RSQLite)}
+if (!require("BiocManager", quietly = TRUE)){
+  install.packages("BiocManager")} 
+if(!require(GenomicFeatures)){
+  BiocManager::install("GenomicFeatures")
+  library(GenomicFeatures)}
+if(!require(Seurat)){
+  BiocManager::install("Seurat")}
