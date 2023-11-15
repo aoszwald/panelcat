@@ -796,7 +796,7 @@
     exoncovd2 <- reactive({
       exoncovd1() %>% filter(transcript == input$exoncovt) %>%
         mutate(covp = (cov_width / width)*100, covtp = (covt_width / width)*100, exon = as.factor(exon)) %>%
-        transform(exon = reorder(exon, rev(order(sort(exon)))))
+        transform(exon = factor(exon, levels = rev(sort(unique(exon)))))
     })
     
     exons_colvec <- reactive({

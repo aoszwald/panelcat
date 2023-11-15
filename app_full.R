@@ -595,7 +595,7 @@
       selectInput('exoncovg', 'Gene', exoncovd()[["group_name"]], selected = exoncovd()[["group_name"]][1])
     })
     output$exoncovtsel <- renderUI({
-      validate(need(input$exoncovg,"Select a gene"))
+      validate(need(input$exoncomp_panel, "Select at least one panel"), need(input$exoncovg,"Select a gene"))
       selectInput('exoncovt', 'Transcript', exoncovd1()[["transcript"]], selected = exoncovd1()[["transcript"]][1])
     })
     output$sel_panelInspect <- renderUI({
@@ -961,11 +961,12 @@
     })
     
     exoncovd2 <- reactive({
+      debugtable <- 
       exoncovd1() %>% filter(transcript == input$exoncovt) %>%
         mutate(covp = (cov_width / width)*100, covtp = (covt_width / width)*100, exon = as.factor(exon)) %>%
-        transform(exon = reorder(exon, rev(order(sort(exon)))))
+        transform(exon = factor(exon, levels = rev(sort(unique(exon)))))
     })
-    
+    # 
     exons_colvec <- reactive({
       setNames(c("grey95",distinctColorPalette(length(unique(exoncovd2()[["panel"]])))),
                c("total",unique(exoncovd2()[["panel"]])))
