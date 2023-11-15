@@ -44,11 +44,11 @@ sudo apt install libxml2-dev
 - By default, shiny server will start one server process listening on port 3838 (this means you will access the panelcat app running on your server by entering e.g. "123.456.789.12:3838/panelcat" (123.456.789.12 being a placeholder for your IP in the network).
 - Accessing this adress will activate the script in the file "app.R" (not "app_full.R").
 - In contrast to the "app_full.R" script, the "app.R" file does not include functions to update the databases and save new analyses permanently. This is useful on a server, where you want to have full control over updates and permanently saved panels (and not the users who access your server via browser!).
-- You *could* delete "app.R", then rename "app_full.R" to "app.R", and give the shiny app ownership over its own folder, i.e.
+- You *could* delete "app.R", then rename "app_full.R" to "app.R", and then give the shiny app ownership over its own folder: 
 ```bash
 sudo chown shiny:shiny /srv/shiny-server/panelcat
 ```
-- ... but do so at your own risk, since it may compromise the security of your system.
+- This *may* enable clients to access your server with the full functionality of permanently saving panels, and performing database updates (this has not been tested). *However*, do so at your own risk, since it may compromise the security of your system.
 ## New panel analysis
 - PanelCat uses hg19 (GRCh37) based databases. Please ensure that your target region file is also hg19 (GRCh37) based.
 - To analyse a new panel, go to the "NewPanel" tab. Target regions need to be provided as a tab-separated table (typically .bed or .txt) that includes the following columns: Chromosome, Start, Stop (e.g. chr1	27100287	27100394). Additional columns may be present.
