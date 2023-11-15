@@ -23,6 +23,7 @@ update.all(ask = F)
 - Go to Tab "New Analysis" -> UPDATE ALL (at the bottom of the left side panel). PanelCat will acquire current RefSeq and Clinvar databases, and process the COSMIC CMC database. Processing the COSMIC database will take quite some time because the gene names will be updated (and this step is slow).
 - PanelCat will then update all pre-supplied panel analyses using the updated databases.
 - The cmc_export.tsv file may be deleted after this step is complete.
+- The "app_full.R" file contains scripts to update databases and permanently save panel analyses. You should use this file only if you are running it on a local device. However, once you have downloaded current databases, you may also use "app.R" if you do not care about saving new analyses permanently, it will start a little bit faster.
 ## Installation - Linux
 - You can use the same steps as described above for Windows, but you may need to install additional Linux packages first. For example, if using Ubuntu, go into terminal and install the packages libcurl4-openssl-dev, libssl-dev, xml2-config and libxml2-dev, using
 ```bash 
@@ -32,8 +33,16 @@ sudo apt install xml2-config
 sudo apt install libxml2-dev
 ```
 ## Installation on your own Shiny Server
-- This is only possible using a Linux environment (you may use a virtual machine, but this is beyond the scope of this guide). Assuming you are using Ubuntu: Download and install shiny server (https://posit.co/download/shiny-server/). Place the "panelcat" directory (the one that contains "App.R") into the directory /srv/shiny-server/
--  By default, shiny server will start one server process listening on port 3838 (this means you will access the panelcat app running on your server by entering e.g. "123.456.789.12:3838/panelcat" (123.456.789.12 being a placeholder for your IP in the network). The name of the app that you need to specify is equal to the name of the directory that contains the respective App.R file.
+- This is only possible using a Linux environment (you may use a virtual machine, but this is beyond the scope of this guide). Assuming you are using Ubuntu: Download and install shiny server (https://posit.co/download/shiny-server/). 
+- The easiest way is to run "app_full.R" on a device, let the app download and process all the databases and panels you wish to provide on your server, and then copy the entire panelcat directory (the one that contains "app.R") into the directory /srv/shiny-server/ on your server.
+- By default, shiny server will start one server process listening on port 3838 (this means you will access the panelcat app running on your server by entering e.g. "123.456.789.12:3838/panelcat" (123.456.789.12 being a placeholder for your IP in the network).
+- Accessing this adress will activate the script in the file "app.R" (not "app_full.R").
+- In contrast to the "app_full.R" script, the "app.R" file does not include functions to update the databases and save new analyses permanently. This is useful on a server, where you want to have full control over updates and permanently saved panels (and not the users who access your server via browser!).
+- You *could* delete "app.R", then rename "app_full.R" to "app.R", and give the shiny app ownership over its own folder, i.e.
+```bash
+sudo chown shiny:shiny /srv/shiny-server/panelcat
+```
+- ... but do so at your own risk, since it may compromise the security of your system.
 ## operation - basic
 - Run "App_full.R" (for full functionality) or "App.R" (in case of hosting the app in a network, see details below)
 - View analyses results in different tabs. Most of the time, the presentation of results can be controlled by adjusting one or more input parameters.
