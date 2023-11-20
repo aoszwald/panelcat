@@ -1339,8 +1339,8 @@
               table_clv_covbl, by = "Var1"),
             table_clv_tot, by = "Var1")
           colnames(table_clv) <- c("gene","clv_ncov","clv_covt","clv_bl","clv_cov","clv_tot")
-          table_clv$clv_covp <- table_clv$clv_cov/table_clv$clv_tot
-          table_clv$clv_covtp <- table_clv$clv_covt/table_clv$clv_tot
+          table_clv$clv_covp <- (table_clv$clv_cov/table_clv$clv_tot) * 100
+          table_clv$clv_covtp <- (table_clv$clv_covt/table_clv$clv_tot) * 100
           table_clv[is.na(table_clv)] <- 0
           
           # Cosmic ------------------------------------------------------------------
@@ -1410,8 +1410,8 @@
               table_cmc_covbl, by = "Var1"),
             table_cmc_tot, by = "Var1")
           colnames(table_cmc) <- c("gene","cmc_ncov","cmc_covt","cmc_bl","cmc_cov","cmc_tot")
-          table_cmc$cmc_covp <- table_cmc$cmc_cov/table_cmc$cmc_tot
-          table_cmc$cmc_covtp <- table_cmc$cmc_covt/table_cmc$cmc_tot
+          table_cmc$cmc_covp <- (table_cmc$cmc_cov/table_cmc$cmc_tot) * 100
+          table_cmc$cmc_covtp <- (table_cmc$cmc_covt/table_cmc$cmc_tot) * 100
           table_cmc[is.na(table_cmc)] <- 0
           
           # list panel items
@@ -1604,8 +1604,8 @@
               table_clv_covbl, by = "Var1"),
             table_clv_tot, by = "Var1")
           colnames(table_clv) <- c("gene","clv_ncov","clv_covt","clv_bl","clv_cov","clv_tot")
-          table_clv$clv_covp <- table_clv$clv_cov/table_clv$clv_tot
-          table_clv$clv_covtp <- table_clv$clv_covt/table_clv$clv_tot
+          table_clv$clv_covp <- (table_clv$clv_cov/table_clv$clv_tot) * 100
+          table_clv$clv_covtp <- (table_clv$clv_covt/table_clv$clv_tot) * 100
           table_clv[is.na(table_clv)] <- 0
           
           # Cosmic ------------------------------------------------------------------
@@ -1674,8 +1674,8 @@
               table_cmc_covbl, by = "Var1"),
             table_cmc_tot, by = "Var1")
           colnames(table_cmc) <- c("gene","cmc_ncov","cmc_covt","cmc_bl","cmc_cov","cmc_tot")
-          table_cmc$cmc_covp <- table_cmc$cmc_cov/table_cmc$cmc_tot
-          table_cmc$cmc_covtp <- table_cmc$cmc_covt/table_cmc$cmc_tot
+          table_cmc$cmc_covp <- (table_cmc$cmc_cov/table_cmc$cmc_tot) * 100
+          table_cmc$cmc_covtp <- (table_cmc$cmc_covt/table_cmc$cmc_tot) * 100
           table_cmc[is.na(table_cmc)] <- 0
           
           # list panel items
