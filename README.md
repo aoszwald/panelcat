@@ -1,12 +1,17 @@
 # PanelCat ReadMe
-1. [Introduction](#introduction)
-2. [Installation - Windows](#installation---windows)
-3. [Installation - Linux](#installation---linux)
-4. [Installation on your own Shiny server](#installation-on-your-own-shiny-server)
-5. [New panel analysis](#new-panel-analysis)
-6. [Advanced](#advanced)
+1. [Disclaimer](#disclaimer)
+2. [Introduction](#introduction)
+3. [Installation - Windows](#installation---windows)
+4. [Installation - Linux](#installation---linux)
+5. [Installation on your own Shiny server](#installation-on-your-own-shiny-server)
+6. [New panel analysis](#new-panel-analysis)
+7. [Advanced](#advanced)
+## Disclaimer
+- PanelCAT uses specifications of NGS panels (target region files) and public scientific databases (RefSeq, ClinVar, COSMIC) to visualise and compare target regions of NGS Panels. PanelCAT is intended to inform researchers on panel target regions by providing a visualisation of existing data, and to assist in researchers' choice of NGS panels for experimental purposes. The results of PanelCAT are not suggestions for any specific product or manufacturer. The results of this software are for informational use only, research use only, and come with absolutely no guarantee of any form. The results provided by PanelCAT are highly dependent on the input, and on external databases, which are not controlled by PanelCAT.
+- The results of this software are NOT intended for medical purposes, e.g., medical advice, diagnosis, prevention, or treatment decisions. As such, this software is NOT intended to assist in a medical setting in determining, e.g., physiological and pathological states, congenital conditions or predisposition, recipient safety or compatibility, treatment response or interactions, or in monitoring therapeutic measures.
+- Medical tests may only performed by certified and authorised professionals, using devices in accordance with EU 745/2017 (MDR) or EU 746/2017 (IVDR). This software is intended for research-use only and does NOT constitute a medical device according to EU 745/2017 (MDR), and does NOT constitute an in-vitro diagnostic medial device, or an accessory for an in vitro diagnostic medical device, according to EU 746/2017 (IVDR)
 ## Introduction
-- NGS panels are widely used many areas of biological research and medicine. However, correct interpretation of variant calls often requires detailed understanding of the panel target regions. For instance, you may need to know precisely what portion of genes (and more specifically, which exons, or known mutations) are targeted by specific panels. It is useful to directly compare between panels that are available at your lab. PanelCAT (online available at http://panelcat.net) is an open-source tool to analyse, visualise and compare NGS panel target regions. PanelCAT uses R and ShinyR, and is provided per AGPL-3 license. PanelCat is NOT a clinically validated tool and designed for RESEARCH USE ONLY. 
+- NGS panels are widely used many areas of biological research. However, correct interpretation of variant calls often requires detailed understanding of the panel target regions. For instance, you may need to know precisely what portion of genes (and more specifically, which exons, or known mutations) are targeted by specific panels. It is useful to directly compare between panels that are available at your lab. PanelCAT (online available at http://panelcat.net) is an open-source tool to analyse, visualise and compare NGS panel target regions. PanelCAT uses R and ShinyR, and is provided per AGPL-3 license. PanelCat is NOT a clinically validated tool and designed for RESEARCH USE ONLY. 
 - Regarding BED file format and zero-based indexed coordinates, see https://en.wikipedia.org/wiki/BED_(file_format)#Coordinate_system.
 ## Installation - Windows
 - Install R Statistics (https://cran.rstudio.com/) and R Studio (https://posit.co/download/rstudio-desktop/).
